@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "api-local", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:local"], "port": 8787 },
+    { "name": "web-demo", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:demo"], "port": 5173 }
+  ]
+}

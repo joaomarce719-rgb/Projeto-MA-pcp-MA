@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Interface publicada como Worker com arquivos estáticos: https://pcp-ma.mafardamentos.workers.dev
+  "name": "pcp-ma",
+  "compatibility_date": "2026-10-23",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "dist",
+    // O roteador da interface cuida das rotas (/fila, /usuarios...): qualquer caminho devolve o index.html.
+    "not_found_handling": "single-page-application"
+  }
+}

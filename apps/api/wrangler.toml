@@ -1,0 +1,23 @@
+name = "pcp-ma-api"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+# Minificar reduz o pacote pela metade (o Zod 4 é a maior parte) e ajuda na partida a frio do Worker.
+minify = true
+
+[vars]
+# Endereço do projeto Supabase (não é segredo). Troque pelo da MA.
+SUPABASE_URL = "https://tddwcteekakmovczhthh.supabase.co"
+# Endereços da interface autorizados a chamar a API, separados por vírgula.
+CORS_ORIGIN = "http://localhost:5173,https://pcp-ma.mafardamentos.workers.dev"
+
+# Balde das fotos de referência (e, depois, dos comprovantes). Crie com: npx wrangler r2 bucket create pcp-ma-arquivos
+[[r2_buckets]]
+binding = "ARQUIVOS"
+bucket_name = "pcp-ma-arquivos"
+
+# Criado com scripts/criar-hyperdrive.ps1 (Session pooler do Supabase, porta 5432, cache desligado).
+# A conexão "Direct" do Supabase é só IPv6 sem o add-on de IPv4.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "cb8062f96f3045529bcfb09eba2d1fff"

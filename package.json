@@ -1,0 +1,17 @@
+{
+  "name": "pcp-ma",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:local": "npm run dev:local -w apps/api",
+    "dev:demo": "npm run dev:demo -w apps/web"
+  }
+}
