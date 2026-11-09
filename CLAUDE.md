@@ -22,9 +22,9 @@ npm run deploy -w apps/web        # build + wrangler deploy da interface
 ```
 Todo trabalho termina com `npm test`, `npm run typecheck` e `npm run build -w apps/web` verdes.
 
-Antes de publicar a API, confira no SQL Editor do Supabase que todas as migrações de `db/migracoes/` rodaram; a mais recente é a 005 (se der `false`, rode as que faltam antes):
+Antes de publicar a API, confira no SQL Editor do Supabase que todas as migrações de `db/migracoes/` rodaram; a mais recente é a 006 (se der `false`, rode as que faltam antes):
 ```sql
-select exists (select 1 from information_schema.columns where table_name = 'clientes' and column_name = 'anonimizado_em') as pode_publicar;
+select to_regclass('public.alteracoes_usuarios') is not null as pode_publicar;
 ```
 Deploy da API (o R2 ainda não está ativo, então se usa um `wrangler.toml` temporário sem `[[r2_buckets]]`; rodar em `apps/api`):
 ```bash
@@ -62,8 +62,14 @@ awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' w
 Erros da API: 400 dados inválidos, 401 sem login, 403 sem permissão, 404 não encontrado, 409 conflito. Texto sempre em português claro, para quem trabalha na fábrica.
 
 ## Estado da implantação (o que ainda não foi verificado)
-Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e a migração `001_financeiro` aplicados; login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
+Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e as migrações `001` a `005` aplicados (002 a 005 em 09/11/2026, pelo conector MCP do Supabase, registradas em `supabase_migrations`); login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
 
-**A Etapa 2 (catálogo, preço no servidor, orçamento, Quadro e a aba Preços) existe no código e nos testes, mas NÃO foi publicada:** falta aplicar `db/migracoes/002_catalogo.sql`, depois `003_precos.sql`, `004_acessos.sql` e `005_exclusao.sql` no SQL Editor do Supabase e então publicar a API e a interface (nessa ordem). Publicar a API antes das migrações quebra a criação de pedidos e o login (o perfil passa a ler `gerencia_precos`) a ficha e o orçamento (gravam em `acessos_dados_pessoais`) e a busca de clientes (filtra `clientes.anonimizado_em`).
+**Publicado em 09/11/2026:** a Etapa 2 (catálogo, preço no servidor, orçamento, Quadro, aba Preços) e as mudanças de 05 a 09/11 (permissões da Direção, registro de acessos LGPD, pedido de exclusão), na API (versão `26ed94c2`) e na interface (versão `0a0637eb`). Conferido sem login: `/health` 200, rotas protegidas 401, pré-voo CORS 204, login abre sem modo demonstração. Falta conferir com um usuário real (pedido novo, Financeiro, Quadro, LGPD).
+
+**Não publicado:** a edição de usuários (RF-04: `POST /usuarios/:id`, `GET /usuarios/:id/alteracoes`) depende da migração `006_alteracoes_usuarios.sql`, que ainda não foi aplicada no Supabase. Publicar a API antes dela quebra a edição de usuários.
 
 Ainda não rodou contra o banco real: R2/fotos e comprovantes (R2 desativado), o Financeiro com dados reais, e a criação de usuários pela tela (falta o segredo `SUPABASE_SERVICE_ROLE_KEY` no Worker). Os testes usam Postgres em memória. Ver "Pendências" em `docs/TECNOLOGIAS.md`.
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md

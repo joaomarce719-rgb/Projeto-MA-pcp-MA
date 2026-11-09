@@ -7,6 +7,7 @@ import {
   clienteBody,
   concluirBody,
   devolverBody,
+  edicaoUsuarioBody,
   COMPROVANTE_TAMANHO_MAXIMO,
   entregaBody,
   anonimizarBody,
@@ -36,7 +37,7 @@ import { criarPedido } from './pedidos';
 import { atualizarProduto, criarProduto, listarPrecos } from './precos';
 import { obterOrcamento } from './orcamento';
 import { obterQuadro } from './quadro';
-import { criarUsuario, listarUsuarios, mudarAtivo, mudarGerenciaPrecos, trocarSenha } from './usuarios';
+import { criarUsuario, editarUsuario, listarAlteracoes, listarUsuarios, mudarAtivo, mudarGerenciaPrecos, trocarSenha } from './usuarios';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -408,6 +409,24 @@ export function criarApp<E extends object & { CORS_ORIGIN?: string }>(deps: Deps
     const r = await criarUsuario(c.var.db, deps.adminAuth(c.env), c.var.perfil, corpo.dados);
     if (!r.ok) return c.json({ erro: r.erro }, r.status);
     return c.json({ id: r.id }, 201);
+  });
+
+  app.post('/usuarios/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!UUID.test(id)) return c.json({ erro: 'Usuário inválido.' }, 400);
+    const corpo = await lerCorpo(c, edicaoUsuarioBody);
+    if (corpo.resposta) return corpo.resposta;
+    const r = await editarUsuario(c.var.db, c.var.perfil, id, corpo.dados);
+    if (!r.ok) return c.json({ erro: r.erro }, r.status);
+    return c.json({ ok: true });
+  });
+
+  app.get('/usuarios/:id/alteracoes', async (c) => {
+    const id = c.req.param('id');
+    if (!UUID.test(id)) return c.json({ erro: 'Usuário inválido.' }, 400);
+    const r = await listarAlteracoes(c.var.db, c.var.perfil, id);
+    if (!r.ok) return c.json({ erro: r.erro }, r.status);
+    return c.json({ alteracoes: r.alteracoes });
   });
 
   app.post('/usuarios/:id/ativo', async (c) => {

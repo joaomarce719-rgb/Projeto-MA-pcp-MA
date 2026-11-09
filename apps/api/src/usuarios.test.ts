@@ -243,3 +243,143 @@ describe('cliente do Supabase Auth (adminSupabase), com respostas simuladas', ()
     await expect(auth.apagar('u3')).rejects.toThrow(/500/);
   });
 });
+
+describe('editar usuário (RF-04)', () => {
+  const editar = (id: string, corpo: object, quem: string | null = ID.admin) => amb.chamar(quem, `/usuarios/${id}`, corpo);
+  const alteracoes = async () =>
+    (await amb.pg.query<{ perfil_id: string; alterado_por: string; antes: unknown; depois: unknown }>(
+      'select perfil_id, alterado_por, antes, depois from alteracoes_usuarios order by id',
+    )).rows;
+
+  it('troca o setor: a fila e a permissão seguem o setor novo já na próxima requisição', async () => {
+    const naCostura = await amb.lote({ descricao: 'Pedido da Costura', etapa: 'Costura' });
+    await amb.lote({ descricao: 'Pedido do Laser', etapa: 'Laser' });
+    const concluidoAntes = await amb.lote({ descricao: 'Pedido concluído', etapa: 'Costura' });
+    expect((await amb.chamar(ID.costura, `/lotes/${concluidoAntes}/concluir`, { versao: 1 })).status).toBe(200);
+
+    const r = await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Laser' });
+    expect(r.status).toBe(200);
+
+    const { lotes } = (await (await amb.chamar(ID.costura, '/fila')).json()) as { lotes: { descricao: string }[] };
+    expect(lotes.map((l) => l.descricao)).toEqual(['Pedido do Laser']);
+    expect((await amb.chamar(ID.costura, `/lotes/${naCostura}/concluir`, { versao: 1 })).status).not.toBe(200);
+
+    const ficha = (await (await amb.chamar(ID.admin, `/lotes/${concluidoAntes}`)).json()) as { historico: { por: string }[] };
+    expect(ficha.historico.map((h) => h.por)).toContain('João');
+
+    expect(await alteracoes()).toEqual([
+      { perfil_id: ID.costura, alterado_por: ID.admin, antes: { setor: 'Costura' }, depois: { setor: 'Laser' } },
+    ]);
+  });
+
+  it('não muda e-mail nem situação', async () => {
+    await amb.chamar(ID.admin, `/usuarios/${ID.costura}/ativo`, { ativo: false });
+    await editar(ID.costura, { nome: 'João Silva', papel: 'setor', setor: 'Costura', email: 'outro@x.com', ativo: true });
+    const p = (await amb.pg.query('select nome, email, ativo from perfis where id = $1', [ID.costura])).rows[0];
+    expect(p).toEqual({ nome: 'João Silva', email: 'costura@teste.local', ativo: false });
+  });
+
+  it('sem mudança: 200 e nada no registro', async () => {
+    expect((await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Costura' })).status).toBe(200);
+    expect(await alteracoes()).toEqual([]);
+  });
+
+  it('só o administrador edita: os demais recebem 403 e nada muda', async () => {
+    for (const quem of [ID.atendimento, ID.direcao, ID.impressao]) {
+      const r = await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Laser' }, quem);
+      expect(r.status).toBe(403);
+      expect(await erroDe(r)).toBe('Só o Administrador gerencia usuários.');
+    }
+    expect((await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Laser' }, null)).status).toBe(401);
+    expect(await alteracoes()).toEqual([]);
+  });
+
+  it('usuário que não existe: 404; endereço inválido e corpo inválido: 400', async () => {
+    expect((await editar('00000000-0000-0000-0000-000000000000', { nome: 'Fulano', papel: 'admin' })).status).toBe(404);
+    expect((await editar('xyz', { nome: 'Fulano', papel: 'admin' })).status).toBe(400);
+    const r = await editar(ID.costura, { nome: 'João', papel: 'setor' });
+    expect(r.status).toBe(400);
+    expect(await erroDe(r)).toMatch(/Escolha o setor/);
+  });
+
+  it('o banco recusa alterar ou apagar o registro', async () => {
+    await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Laser' });
+    await expect(amb.pg.query(`update alteracoes_usuarios set antes = '{}'`)).rejects.toThrow(/não pode ser alterado/);
+    await expect(amb.pg.query('delete from alteracoes_usuarios')).rejects.toThrow(/não pode ser alterado/);
+    await expect(amb.pg.query('truncate alteracoes_usuarios')).rejects.toThrow(/não pode ser alterado/);
+  });
+});
+
+describe('editar o papel e o nome (RF-04)', () => {
+  const editar = (id: string, corpo: object, quem: string = ID.admin) => amb.chamar(quem, `/usuarios/${id}`, corpo);
+  const perfil = async (id: string) =>
+    (await amb.pg.query('select nome, papel, setor, gerencia_precos from perfis where id = $1', [id])).rows[0];
+
+  it('setor vira Atendimento: perde o setor e passa a ver clientes', async () => {
+    expect((await amb.chamar(ID.costura, '/clientes')).status).toBe(403);
+    expect((await editar(ID.costura, { nome: 'João', papel: 'atendimento' })).status).toBe(200);
+    expect(await perfil(ID.costura)).toMatchObject({ papel: 'atendimento', setor: null });
+    expect((await amb.chamar(ID.costura, '/clientes')).status).toBe(200);
+  });
+
+  it('sair do Atendimento tira a permissão de gerenciar preços, e isso entra no registro', async () => {
+    await amb.pg.query('update perfis set gerencia_precos = true where id = $1', [ID.atendimento]);
+    expect((await editar(ID.atendimento, { nome: 'Atendimento', papel: 'direcao' })).status).toBe(200);
+    expect(await perfil(ID.atendimento)).toMatchObject({ papel: 'direcao', gerencia_precos: false });
+    const [linha] = (await amb.pg.query('select antes, depois from alteracoes_usuarios')).rows;
+    expect(linha).toEqual({
+      antes: { papel: 'atendimento', gerenciaPrecos: true },
+      depois: { papel: 'direcao', gerenciaPrecos: false },
+    });
+  });
+
+  it('o administrador não tira de si o papel de Administrador: 409 e nada gravado', async () => {
+    const r = await editar(ID.admin, { nome: 'Admin', papel: 'direcao' });
+    expect(r.status).toBe(409);
+    expect(await erroDe(r)).toBe('Você não pode tirar de si o papel de Administrador.');
+    expect(await perfil(ID.admin)).toMatchObject({ papel: 'admin' });
+    expect((await amb.pg.query('select 1 from alteracoes_usuarios')).rows).toHaveLength(0);
+    expect((await editar(ID.admin, { nome: 'Admin Geral', papel: 'admin' })).status).toBe(200);
+  });
+
+  it('nome curto é recusado; nome novo aparece em /me e na ficha, sem espaços nas pontas', async () => {
+    const r = await editar(ID.costura, { nome: 'J', papel: 'setor', setor: 'Costura' });
+    expect(r.status).toBe(400);
+    expect(await erroDe(r)).toBe('Informe o nome da pessoa.');
+
+    const lote = await amb.lote({ descricao: 'Pedido', etapa: 'Costura' });
+    expect((await amb.chamar(ID.costura, `/lotes/${lote}/concluir`, { versao: 1 })).status).toBe(200);
+    await editar(ID.costura, { nome: '  João Pereira  ', papel: 'setor', setor: 'Costura' });
+    expect(await (await amb.chamar(ID.costura, '/me')).json()).toMatchObject({ nome: 'João Pereira' });
+    const ficha = (await (await amb.chamar(ID.admin, `/lotes/${lote}`)).json()) as { historico: { por: string }[] };
+    expect(ficha.historico.map((h) => h.por)).toContain('João Pereira');
+  });
+});
+
+describe('alterações de um usuário (RF-04)', () => {
+  const editar = (id: string, corpo: object) => amb.chamar(ID.admin, `/usuarios/${id}`, corpo);
+  const ver = (id: string, quem: string = ID.admin) => amb.chamar(quem, `/usuarios/${id}/alteracoes`);
+
+  it('lista a mais recente primeiro, com quem alterou, antes e depois', async () => {
+    await editar(ID.costura, { nome: 'João', papel: 'setor', setor: 'Laser' });
+    await editar(ID.costura, { nome: 'João', papel: 'atendimento' });
+    const r = await ver(ID.costura);
+    expect(r.status).toBe(200);
+    const { alteracoes } = (await r.json()) as { alteracoes: { alteradoPor: string; antes: object; depois: object; criadoEm: string }[] };
+    expect(alteracoes.map(({ alteradoPor, antes, depois }) => ({ alteradoPor, antes, depois }))).toEqual([
+      { alteradoPor: 'Admin', antes: { papel: 'setor', setor: 'Laser' }, depois: { papel: 'atendimento', setor: null } },
+      { alteradoPor: 'Admin', antes: { setor: 'Costura' }, depois: { setor: 'Laser' } },
+    ]);
+    expect(alteracoes[0]!.criadoEm).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('nunca editado: lista vazia', async () => {
+    expect(await (await ver(ID.laser)).json()).toEqual({ alteracoes: [] });
+  });
+
+  it('só o administrador vê; usuário que não existe: 404; endereço inválido: 400', async () => {
+    for (const quem of [ID.atendimento, ID.direcao, ID.costura]) expect((await ver(ID.costura, quem)).status).toBe(403);
+    expect((await ver('00000000-0000-0000-0000-000000000000')).status).toBe(404);
+    expect((await ver('xyz')).status).toBe(400);
+  });
+});

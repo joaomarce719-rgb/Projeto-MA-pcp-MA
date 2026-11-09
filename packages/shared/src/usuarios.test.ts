@@ -1,5 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { ativoBody, senhaBody, usuarioBody } from './index';
+import { ativoBody, edicaoUsuarioBody, mudancasDoUsuario, podeEditarUsuario, senhaBody, usuarioBody } from './index';
+
+describe('editar usuário (RF-04)', () => {
+  const erroDa = (corpo: unknown) => {
+    const r = edicaoUsuarioBody.safeParse(corpo);
+    return r.success ? {} : Object.fromEntries(r.error.issues.map((i) => [i.path.join('.'), i.message]));
+  };
+
+  it('mesmas regras de nome, papel e setor da criação, sem e-mail nem senha', () => {
+    expect(erroDa({ nome: 'A', papel: 'atendimento' }).nome).toBe('Informe o nome da pessoa.');
+    expect(erroDa({ nome: 'Maria', papel: 'setor' }).setor).toBe('Escolha o setor desta pessoa.');
+    expect(erroDa({ nome: 'Maria', papel: 'atendimento', setor: 'Laser' }).setor).toBe('Só quem é de setor tem setor.');
+    expect(edicaoUsuarioBody.parse({ nome: '  Maria  ', papel: 'setor', setor: 'Laser' })).toEqual({ nome: 'Maria', papel: 'setor', setor: 'Laser' });
+  });
+
+  const atual = { nome: 'João', papel: 'setor' as const, setor: 'Costura', gerenciaPrecos: false };
+
+  it('sem mudança, nada a registrar', () => {
+    expect(mudancasDoUsuario(atual, { nome: 'João', papel: 'setor', setor: 'Costura' })).toBeNull();
+  });
+
+  it('só o que mudou entra no antes e depois', () => {
+    expect(mudancasDoUsuario(atual, { nome: 'João', papel: 'setor', setor: 'Embalagem' })).toEqual({
+      antes: { setor: 'Costura' },
+      depois: { setor: 'Embalagem' },
+    });
+  });
+
+  it('sair do Atendimento tira a permissão de gerenciar preços', () => {
+    const at = { nome: 'Rita', papel: 'atendimento' as const, setor: null, gerenciaPrecos: true };
+    expect(mudancasDoUsuario(at, { nome: 'Rita', papel: 'direcao' })).toEqual({
+      antes: { papel: 'atendimento', gerenciaPrecos: true },
+      depois: { papel: 'direcao', gerenciaPrecos: false },
+    });
+  });
+
+  it('o Administrador não tira de si o papel de Administrador', () => {
+    expect(podeEditarUsuario('a', 'a', 'direcao')).toBe(false);
+    expect(podeEditarUsuario('a', 'a', 'admin')).toBe(true);
+    expect(podeEditarUsuario('a', 'b', 'direcao')).toBe(true);
+  });
+});
 
 const base = { nome: 'Maria Souza', email: 'maria@ma.com.br', senha: 'senha-segura-1', papel: 'atendimento' };
 
