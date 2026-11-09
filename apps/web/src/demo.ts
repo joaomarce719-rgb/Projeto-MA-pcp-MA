@@ -61,7 +61,7 @@ export function entrarComoDemo(acesso: AcessoDemo): void {
       user: { id: acesso.id, aud: 'authenticated', role: 'authenticated', email: `${acesso.login}@demo.local`, app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' },
     }),
   );
-  window.location.assign('/fila');
+  window.location.assign('/');
 }
 
 /** Sair do modo demonstração: não há servidor de login para avisar, então só se apaga a sessão guardada. */

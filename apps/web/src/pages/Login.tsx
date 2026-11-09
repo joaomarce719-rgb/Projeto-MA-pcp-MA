@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState, type FormEvent } from 'react';
 import { ACESSOS_DEMO, MODO_DEMO, SENHA_DEMO, acessoDoLogin, entrarComoDemo } from '../demo';
@@ -5,6 +6,7 @@ import { supabase } from '../supabase';
 
 export function Login() {
   const navegar = useNavigate();
+  const cache = useQueryClient();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
@@ -23,7 +25,9 @@ export function Login() {
       setErro('Usuário ou senha incorretos.');
       return;
     }
-    await navegar({ to: '/fila' });
+    // Nada da pessoa anterior (perfil, filas) pode sobrar para quem acabou de entrar neste aparelho.
+    cache.clear();
+    await navegar({ to: '/' });
   }
 
   return (

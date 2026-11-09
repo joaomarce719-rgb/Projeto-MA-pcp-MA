@@ -31,3 +31,24 @@ export const gerenciaUsuarios = (perfil: Pick<Perfil, 'papel'>): boolean => perf
 /** RN-19: só o setor onde o pedido está (ou o Administrador) mexe nele. Se a etapa é de produção, quem confere é quem chama. */
 export const trabalhaNaEtapa = (perfil: Pick<Perfil, 'papel' | 'setor'>, etapa: string): boolean =>
   perfil.papel === 'admin' || (perfil.papel === 'setor' && perfil.setor === etapa);
+
+/** Primeira tela depois de entrar: a Direção abre no Quadro; os demais, nos pedidos (ou na fila do setor). */
+export const paginaInicial = (perfil: Pick<Perfil, 'papel'>): '/quadro' | '/fila' =>
+  perfil.papel === 'direcao' ? '/quadro' : '/fila';
+
+/**
+ * RNF-02 (LGPD, minimização): documento como sai na busca de clientes. CPF (11 dígitos) é de pessoa: mostra só os do
+ * meio (***.456.789-**). CNPJ (14 dígitos) é da empresa e público: sai inteiro, como foi digitado. Outro formato: só os
+ * dois últimos dígitos aparecem.
+ */
+export function mascararDocumento(documento: string | null): string | null {
+  if (!documento) return null;
+  const d = documento.replace(/\D/g, '');
+  if (d.length === 14) return documento;
+  if (d.length === 11) return `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`;
+  let resto = d.length - 2;
+  return documento.replace(/\d/g, (c) => (resto-- > 0 ? '*' : c));
+}
+
+/** LGPD: quem registra pedidos de exclusão e anonimiza clientes. Só o Administrador. */
+export const cuidaDaLgpd = (perfil: Pick<Perfil, 'papel'>): boolean => perfil.papel === 'admin';

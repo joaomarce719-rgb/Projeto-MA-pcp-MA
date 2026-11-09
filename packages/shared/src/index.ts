@@ -10,3 +10,4 @@ export * from './schemas';
 export * from './usuarios';
 export * from './produto';
 export * from './permissoes';
+export * from './lgpd';

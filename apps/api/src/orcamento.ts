@@ -1,4 +1,5 @@
 import { saldoCentavos, veDadosPessoais, veValores, type ItemDoOrcamento, type OrcamentoDoPedido, type Perfil, nomesDosAdicionais } from '@pcp/shared';
+import { registrarAcesso } from './acessos';
 import type { Db } from './db';
 import type { Falha } from './lote';
 
@@ -15,6 +16,7 @@ interface LoteLinha {
   cDocumento: string | null;
   cTelefone: string | null;
   cCidade: string | null;
+  clienteId: string | null;
 }
 
 interface ItemLinha {
@@ -41,7 +43,8 @@ export async function obterOrcamento(db: Db, perfil: Perfil, loteId: string): Pr
     `select l.numero::integer as numero, l.tipo, l.descricao, l.data_entrega::text as "dataEntrega", l.prioridade, l.bordado,
             l.total_centavos as "totalCentavos",
             (l.criado_em at time zone 'America/Fortaleza')::date::text as "criadoEm",
-            c.nome as "cNome", c.documento as "cDocumento", c.telefone as "cTelefone", c.cidade as "cCidade"
+            c.nome as "cNome", c.documento as "cDocumento", c.telefone as "cTelefone", c.cidade as "cCidade",
+            l.cliente_id as "clienteId"
        from lotes l left join clientes c on c.id = l.cliente_id
       where l.id = $1`,
     [loteId],
@@ -74,6 +77,8 @@ export async function obterOrcamento(db: Db, perfil: Perfil, loteId: string): Pr
   }));
   const recebido = recebimentos.reduce((soma, r) => soma + r.valorCentavos, 0);
 
+  // RNF-02: registra depois de montar tudo e antes de devolver; se o registro falhar, o dado não sai.
+  if (l.clienteId && l.cNome) await registrarAcesso(db, perfil.id, 'orcamento', [l.clienteId], loteId);
   return {
     ok: true,
     orcamento: {

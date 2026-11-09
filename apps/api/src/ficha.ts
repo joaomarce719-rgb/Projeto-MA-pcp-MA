@@ -11,6 +11,7 @@ import {
   type Perfil,
   type RecebimentoLinha,
 } from '@pcp/shared';
+import { registrarAcesso } from './acessos';
 import type { Db } from './db';
 import type { Falha } from './lote';
 
@@ -117,5 +118,7 @@ export async function obterFicha(db: Db, perfil: Perfil, loteId: string): Promis
       recebimentos,
     };
   }
+  // RNF-02: registra depois de montar tudo e antes de devolver; se o registro falhar, o dado não sai.
+  if (ficha.cliente) await registrarAcesso(db, perfil.id, 'ficha', [ficha.cliente.id], l.id);
   return { ok: true, ficha };
 }

@@ -372,7 +372,7 @@ Princípios:
 | ID | Estado | Nota |
 |---|---|---|
 | RNF-01 | Feito | Permissões na API, com testes por perfil |
-| RNF-02 | Parcial | O setor nunca recebe documento nem telefone (testado); falta o registro de acesso |
+| RNF-02 | Feito | O setor nunca recebe documento nem telefone (testado). A busca de clientes sai sem telefone e com o CPF mascarado (`mascararDocumento`); a ficha e o orçamento, que entregam os dados completos, gravam em `acessos_dados_pessoais` (migração 004) quem recebeu os dados de qual cliente, logo antes de responder (se o registro falhar, o dado não sai); o banco recusa alterar ou apagar o registro (`acessos.test.ts`). Pedido de exclusão (LGPD art. 18): o Administrador registra na tela LGPD e o sistema mostra a partir de quando pode anonimizar (5 anos a partir de 1º de janeiro do ano seguinte ao pedido mais recente, art. 173 do CTN; constante `PRAZO_DE_GUARDA_ANOS`); a anonimização limpa cadastro, descrição e observações dos pedidos e guarda quem fez (migração 005, `lgpd.test.ts`). CNPJ não entra. Falta (decisão da MA): tela para consultar o registro de acessos, por quanto tempo guardá-lo, e o contador confirmar o prazo de guarda |
 | RNF-03 | Parcial | Fotos privadas: só saem da API, com a permissão por setor (`fotos.ts`, testado); o R2 de verdade ainda não foi verificado. Comprovantes ficam para a Etapa 2 |
 | RNF-04 | Feito | `versao` e checagem de etapa na gravação; dois cliques testados |
 | RNF-05 | Feito | Em até 20 s |

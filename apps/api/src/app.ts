@@ -9,8 +9,10 @@ import {
   devolverBody,
   COMPROVANTE_TAMANHO_MAXIMO,
   entregaBody,
+  anonimizarBody,
   gerenciaPrecosBody,
   pedidoBody,
+  pedidoDeExclusaoBody,
   produtoBody,
   recebimentoBody,
   senhaBody,
@@ -22,6 +24,7 @@ import type { AdminAuth } from './adminAuth';
 import type { Armazenamento } from './armazenamento';
 import { listarCatalogo } from './catalogo';
 import { buscarClientes, criarCliente } from './clientes';
+import { anonimizarCliente, listarClientesAAnonimizar, registrarPedidoDeExclusao } from './lgpd';
 import { concluirLote } from './concluir';
 import type { Conexao, Db } from './db';
 import { devolverLote } from './devolver';
@@ -208,6 +211,35 @@ export function criarApp<E extends object & { CORS_ORIGIN?: string }>(deps: Deps
     const r = await criarCliente(c.var.db, c.var.perfil, corpo.dados);
     if (!r.ok) return c.json({ erro: r.erro }, r.status);
     return c.json({ cliente: r.cliente }, 201);
+  });
+
+  /** LGPD art. 18 (só o Administrador): registra o pedido de exclusão e diz a partir de quando o cliente pode ser anonimizado. */
+  app.post('/clientes/:id/exclusao', async (c) => {
+    const id = c.req.param('id');
+    if (!UUID.test(id)) return c.json({ erro: 'Cliente inválido.' }, 400);
+    const corpo = await lerCorpo(c, pedidoDeExclusaoBody);
+    if (corpo.resposta) return corpo.resposta;
+    const r = await registrarPedidoDeExclusao(c.var.db, c.var.perfil, id, corpo.dados);
+    if (!r.ok) return c.json({ erro: r.erro }, r.status);
+    return c.json({ liberadoEm: r.liberadoEm, impedimento: r.impedimento }, 201);
+  });
+
+  /** A lista "Clientes a anonimizar" (só o Administrador). */
+  app.get('/lgpd/exclusoes', async (c) => {
+    const r = await listarClientesAAnonimizar(c.var.db, c.var.perfil);
+    if (!r.ok) return c.json({ erro: r.erro }, r.status);
+    return c.json({ clientes: r.clientes });
+  });
+
+  /** Anonimiza o cliente depois do prazo de guarda (só o Administrador, confirmando com o nome do cliente). */
+  app.post('/clientes/:id/anonimizar', async (c) => {
+    const id = c.req.param('id');
+    if (!UUID.test(id)) return c.json({ erro: 'Cliente inválido.' }, 400);
+    const corpo = await lerCorpo(c, anonimizarBody);
+    if (corpo.resposta) return corpo.resposta;
+    const r = await anonimizarCliente(c.var.db, c.var.perfil, id, corpo.dados);
+    if (!r.ok) return c.json({ erro: r.erro }, r.status);
+    return c.json({ observacoesTrocadas: r.observacoesTrocadas });
   });
 
   /** RF-14: abre o pedido e o envia para o Design. */

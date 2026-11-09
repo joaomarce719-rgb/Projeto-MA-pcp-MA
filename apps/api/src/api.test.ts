@@ -214,7 +214,7 @@ describe('o banco fecha o acesso à chave pública', () => {
     for (const papel of ['anon', 'authenticated']) {
       const r = await pg.query<{ tabela: string; pode: boolean }>(
         `select t as tabela, has_table_privilege($1, 'public.' || t, 'select') as pode
-           from unnest(array['perfis','clientes','lotes','itens_pedido','historico']) as t`,
+           from unnest(array['perfis','clientes','lotes','itens_pedido','historico','acessos_dados_pessoais']) as t`,
         [papel],
       );
       expect(r.rows.filter((x) => x.pode)).toEqual([]);

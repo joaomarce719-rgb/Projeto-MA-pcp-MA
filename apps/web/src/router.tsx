@@ -1,5 +1,6 @@
 import {
   Link,
+  Navigate,
   Outlet,
   createRootRoute,
   createRoute,
@@ -8,11 +9,12 @@ import {
   useNavigate,
 } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { abrePedidos, gerenciaUsuarios, podeGerenciarPrecos, veQuadro, veValores } from '@pcp/shared';
+import { abrePedidos, cuidaDaLgpd, gerenciaUsuarios, paginaInicial, podeGerenciarPrecos, veQuadro, veValores } from '@pcp/shared';
 import { MODO_DEMO, sairDoDemo } from './demo';
 import { useEu } from './eu';
 import { Fila } from './pages/Fila';
 import { Financeiro } from './pages/Financeiro';
+import { Lgpd } from './pages/Lgpd';
 import { Login } from './pages/Login';
 import { NovoPedido } from './pages/NovoPedido';
 import { Orcamento } from './pages/Orcamento';
@@ -51,6 +53,7 @@ function Layout() {
           {p && veValores(p) && <Link to="/financeiro">Financeiro</Link>}
           {p && podeGerenciarPrecos(p) && <Link to="/precos">Preços</Link>}
           {p && gerenciaUsuarios(p) && <Link to="/usuarios">Usuários</Link>}
+          {p && cuidaDaLgpd(p) && <Link to="/lgpd">LGPD</Link>}
         </nav>
         <button className="sec" onClick={sair}>
           Sair
@@ -70,10 +73,17 @@ async function exigirLogin() {
   if (!data.session) throw redirect({ to: '/login' });
 }
 
-/** Quem já entrou e abre /login vai direto para a fila. */
+/** Quem já entrou e abre /login vai direto para a sua primeira tela. */
 async function pularLoginSeJaEntrou() {
   const { data } = await supabase.auth.getSession();
-  if (data.session) throw redirect({ to: '/fila' });
+  if (data.session) throw redirect({ to: '/' });
+}
+
+/** Primeira tela de cada perfil (`paginaInicial`, em `permissoes.ts`). */
+function PaginaInicial() {
+  const eu = useEu();
+  if (eu.isPending) return <p className="mudo">Carregando…</p>;
+  return <Navigate to={eu.data ? paginaInicial(eu.data) : '/fila'} replace />;
 }
 
 const login = createRoute({ getParentRoute: () => raiz, path: '/login', component: Login, beforeLoad: pularLoginSeJaEntrou });
@@ -85,15 +95,10 @@ const orcamento = createRoute({ getParentRoute: () => area, path: '/orcamento/$p
 const novo = createRoute({ getParentRoute: () => area, path: '/novo', component: NovoPedido });
 const precos = createRoute({ getParentRoute: () => area, path: '/precos', component: Precos });
 const usuarios = createRoute({ getParentRoute: () => area, path: '/usuarios', component: Usuarios });
-const inicio = createRoute({
-  getParentRoute: () => raiz,
-  path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/fila' });
-  },
-});
+const lgpd = createRoute({ getParentRoute: () => area, path: '/lgpd', component: Lgpd });
+const inicio = createRoute({ getParentRoute: () => area, path: '/', component: PaginaInicial });
 
-const arvore = raiz.addChildren([inicio, login, area.addChildren([fila, quadro, novo, financeiro, orcamento, precos, usuarios])]);
+const arvore = raiz.addChildren([login, area.addChildren([inicio, fila, quadro, novo, financeiro, orcamento, precos, usuarios, lgpd])]);
 
 export const router = createRouter({ routeTree: arvore });
 

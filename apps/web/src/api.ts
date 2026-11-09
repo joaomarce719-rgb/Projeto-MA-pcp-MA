@@ -1,4 +1,5 @@
 import type {
+  ClienteAAnonimizar,
   ClienteBody,
   ClienteLinha,
   ConcluirBody,
@@ -90,6 +91,11 @@ export const api = {
   mudarAtivo: (id: string, ativo: boolean) => chamar<{ ok: true }>(`/usuarios/${id}/ativo`, { ativo }),
   mudarGerenciaPrecos: (id: string, gerenciaPrecos: boolean) => chamar<{ ok: true }>(`/usuarios/${id}/precos`, { gerenciaPrecos }),
   trocarSenha: (id: string, senha: string) => chamar<{ ok: true }>(`/usuarios/${id}/senha`, { senha }),
+  lgpdExclusoes: () => chamar<{ clientes: ClienteAAnonimizar[] }>('/lgpd/exclusoes'),
+  pedirExclusao: (clienteId: string, motivo: string) =>
+    chamar<{ liberadoEm: string; impedimento: string | null }>(`/clientes/${clienteId}/exclusao`, { motivo }),
+  anonimizar: (clienteId: string, confirmacao: string) =>
+    chamar<{ observacoesTrocadas: number }>(`/clientes/${clienteId}/anonimizar`, { confirmacao }),
   /** A foto sai da API (com a permissão conferida), então vem como arquivo, não como endereço público. */
   foto: async (id: string): Promise<Blob> => (await pedir(`/fotos/${id}`)).blob(),
   enviarFoto: async (pedidoId: string, imagem: Blob, nome: string): Promise<{ id: string }> => {

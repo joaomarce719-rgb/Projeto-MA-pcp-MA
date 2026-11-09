@@ -93,7 +93,7 @@ export async function criarPedido(db: Db, perfil: Perfil, body: PedidoBody): Pro
     let descricao = body.descricao ?? '';
     let clienteId: string | null = null;
     if (body.tipo === 'Cliente') {
-      const [cliente] = await tx.query<{ id: string; nome: string }>('select id, nome from clientes where id = $1', [
+      const [cliente] = await tx.query<{ id: string; nome: string }>('select id, nome from clientes where id = $1 and anonimizado_em is null', [
         body.clienteId,
       ]);
       if (!cliente) return { ok: false, status: 400, erro: 'Cliente não encontrado. Escolha um cliente salvo ou cadastre um novo.' };

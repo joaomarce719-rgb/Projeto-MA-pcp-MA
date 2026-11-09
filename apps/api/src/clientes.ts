@@ -1,10 +1,14 @@
-import { abrePedidos, veDadosPessoais, type ClienteBody, type ClienteLinha, type Perfil } from '@pcp/shared';
+import { abrePedidos, mascararDocumento, veDadosPessoais, type ClienteBody, type ClienteLinha, type Perfil } from '@pcp/shared';
 import { ehRepetido, type Db } from './db';
 import type { Falha } from './lote';
 
 const SEM_PERMISSAO: Falha = { ok: false, status: 403, erro: 'Esta área não faz parte do seu perfil.' };
 
-/** RF-09: busca por nome, documento ou cidade. Sem texto, devolve os primeiros por ordem alfabética. */
+/**
+ * RF-09: busca por nome, documento ou cidade. Sem texto, devolve os primeiros por ordem alfabética.
+ * RNF-02 (minimização): a lista só serve para escolher o cliente, então sai sem telefone e com o CPF mascarado
+ * (`mascararDocumento`). Sem dado pessoal completo, a busca não entra no registro de acessos; a ficha e o orçamento entram.
+ */
 export async function buscarClientes(
   db: Db,
   perfil: Perfil,
@@ -14,14 +18,15 @@ export async function buscarClientes(
   // % e _ são curingas do LIKE; quem digita "50%" procura o texto, não "qualquer coisa".
   const termo = texto.trim().replace(/[\\%_]/g, '\\$&');
   const clientes = await db.query<ClienteLinha>(
-    `select id, nome, documento, telefone, cidade
+    `select id, nome, documento, null as telefone, cidade
        from clientes
-      where $1 = '' or lower(nome || ' ' || coalesce(documento, '') || ' ' || coalesce(cidade, '')) like '%' || lower($1) || '%' escape '\\'
+      where anonimizado_em is null
+        and ($1 = '' or lower(nome || ' ' || coalesce(documento, '') || ' ' || coalesce(cidade, '')) like '%' || lower($1) || '%' escape '\\')
       order by nome
       limit 20`,
     [termo],
   );
-  return { ok: true, clientes };
+  return { ok: true, clientes: clientes.map((c) => ({ ...c, documento: mascararDocumento(c.documento) })) };
 }
 
 /** RF-09: cadastra o cliente uma vez. Um documento (CPF/CNPJ) identifica um só cliente. */

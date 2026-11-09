@@ -1,12 +1,11 @@
 <!--
 Sync Impact Report
-- Versão: 2.0.0 → 3.0.0 (MAJOR: o princípio I foi redefinido de novo; a Direção deixa de ser só leitura)
+- Versão: 3.0.0 → 4.0.0 (MAJOR: o princípio III deixa de ser absoluto; abre uma exceção estreita para a LGPD)
 - Princípios alterados (mesmos títulos):
-  - I: a Direção vê tudo, edita produtos e preços (RN-11) e registra recebimentos, comprovantes e
-    entregas; não abre nem altera pedidos e não conclui nem devolve etapas
+  - III: o histórico continua só recebendo inclusões, exceto a anonimização LGPD feita pelo Administrador depois
+    do prazo de guarda, que troca nome, CPF e telefone por [removido] no texto das observações e fica registrada
 - Seções adicionadas/removidas: nenhuma
-- Histórico do dia: 1.0.0 (adoção) → 1.1.0 (regras da REFERENCIA) → 2.0.0 (Direção lê tudo) → 3.0.0
-- Código, RN-11, REFERENCIA §3, TECNOLOGIAS e CLAUDE.md alinhados em 2026-11-05.
+- Histórico: 1.0.0 → 1.1.0 → 2.0.0 → 3.0.0 (05/11) → 4.0.0 (09/11, anonimização, migração 005)
 Fonte: CLAUDE.md ("Regras que não se negociam"), docs/REFERENCIA.md, docs/TECNOLOGIAS.md.
 -->
 # PCP MA Constitution
@@ -52,6 +51,10 @@ Motivo: uma regra, um lugar; mudar a regra muda os dois lados ao mesmo tempo.
   posterior MUST NOT alterar pedidos antigos.
 - Eventos do histórico e recebimentos MUST ser só incluídos, nunca alterados nem apagados; toda
   ação grava quem fez, quando, a etapa e o que foi informado.
+  Única exceção: a anonimização LGPD de um cliente, só pelo Administrador, só depois do prazo de guarda
+  e sem pedido em andamento, MAY trocar nome, CPF e telefone por `[removido]` no texto das observações
+  (`historico.nota`, `lotes.detalhes`) e na descrição dos pedidos; quem fez e quando MUST ficar gravado.
+  Valores, datas, etapas e recebimentos nunca mudam.
 
 Motivo: vários setores mexem no mesmo pedido ao mesmo tempo; erro de valor ou de etapa custa
 dinheiro e entrega.
@@ -117,4 +120,4 @@ Motivo: quem usa e quem mantém o sistema precisa entender a mensagem e o códig
 - Toda especificação, plano e revisão de código MUST conferir os princípios I a V; exceção MUST ser
   justificada por escrito no plano.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-05
+**Version**: 4.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-09

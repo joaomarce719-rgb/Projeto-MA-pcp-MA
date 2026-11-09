@@ -96,6 +96,7 @@ export const devolverBody = z.object({
 });
 export type DevolverBody = z.infer<typeof devolverBody>;
 
+/** Na busca de clientes, `telefone` vem vazio e o CPF vem mascarado (RNF-02); no cadastro e na ficha, completos. */
 export interface ClienteLinha {
   id: string;
   nome: string;

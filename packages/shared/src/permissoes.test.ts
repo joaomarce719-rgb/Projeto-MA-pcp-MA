@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { abrePedidos, gerenciaUsuarios, registraPagamentos, trabalhaNaEtapa, veDadosPessoais, veQuadro, veValores } from './index';
+import {
+  abrePedidos,
+  cuidaDaLgpd,
+  gerenciaUsuarios,
+  mascararDocumento,
+  paginaInicial,
+  registraPagamentos,
+  trabalhaNaEtapa,
+  veDadosPessoais,
+  veQuadro,
+  veValores,
+} from './index';
 
 describe('veValores (RF-02)', () => {
   it('atendimento, direção e admin veem valores', () => {
@@ -35,6 +46,7 @@ describe('demais permissões por perfil', () => {
   it('abrePedidos: atendimento e admin', () => expect(quem(abrePedidos)).toEqual(['atendimento', 'admin']));
   it('veQuadro: direção e admin', () => expect(quem(veQuadro)).toEqual(['direcao', 'admin']));
   it('gerenciaUsuarios: só admin', () => expect(quem(gerenciaUsuarios)).toEqual(['admin']));
+  it('cuidaDaLgpd: só admin', () => expect(quem(cuidaDaLgpd)).toEqual(['admin']));
 });
 
 describe('trabalhaNaEtapa (RN-19)', () => {
@@ -47,5 +59,29 @@ describe('trabalhaNaEtapa (RN-19)', () => {
     expect(trabalhaNaEtapa({ papel: 'admin', setor: null }, 'Laser')).toBe(true);
     expect(trabalhaNaEtapa({ papel: 'atendimento', setor: null }, 'Laser')).toBe(false);
     expect(trabalhaNaEtapa({ papel: 'direcao', setor: null }, 'Laser')).toBe(false);
+  });
+});
+
+describe('paginaInicial', () => {
+  it('a Direção abre no Quadro; os demais, nos pedidos', () => {
+    expect(paginaInicial({ papel: 'direcao' })).toBe('/quadro');
+    for (const papel of ['atendimento', 'setor', 'admin'] as const) expect(paginaInicial({ papel })).toBe('/fila');
+  });
+});
+
+describe('mascararDocumento (RNF-02)', () => {
+  it('CPF mostra só os dígitos do meio, com ou sem pontuação', () => {
+    expect(mascararDocumento('123.456.789-01')).toBe('***.456.789-**');
+    expect(mascararDocumento('12345678901')).toBe('***.456.789-**');
+  });
+
+  it('CNPJ é da empresa: sai inteiro, como foi digitado', () => {
+    expect(mascararDocumento('00.000.000/0001-00')).toBe('00.000.000/0001-00');
+  });
+
+  it('outro formato: só os dois últimos dígitos aparecem; vazio continua vazio', () => {
+    expect(mascararDocumento('RG 1234567')).toBe('RG *****67');
+    expect(mascararDocumento(null)).toBeNull();
+    expect(mascararDocumento('')).toBeNull();
   });
 });

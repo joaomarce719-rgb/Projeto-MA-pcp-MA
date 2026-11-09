@@ -22,6 +22,10 @@ npm run deploy -w apps/web        # build + wrangler deploy da interface
 ```
 Todo trabalho termina com `npm test`, `npm run typecheck` e `npm run build -w apps/web` verdes.
 
+Antes de publicar a API, confira no SQL Editor do Supabase que todas as migrações de `db/migracoes/` rodaram; a mais recente é a 005 (se der `false`, rode as que faltam antes):
+```sql
+select exists (select 1 from information_schema.columns where table_name = 'clientes' and column_name = 'anonimizado_em') as pode_publicar;
+```
 Deploy da API (o R2 ainda não está ativo, então se usa um `wrangler.toml` temporário sem `[[r2_buckets]]`; rodar em `apps/api`):
 ```bash
 awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' wrangler.toml > wrangler.sem-r2.toml && npx wrangler deploy -c wrangler.sem-r2.toml; rm -f wrangler.sem-r2.toml
@@ -51,6 +55,8 @@ awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' w
 11. **A chave `service_role`/`sb_secret_` do Supabase** só existe como segredo do Worker (`SUPABASE_SERVICE_ROLE_KEY`) e só a tela de usuários a usa. Vai apenas no cabeçalho `apikey` (e em `Authorization: Bearer` só se começar com `eyJ`). Nunca no código, no navegador ou em mensagens de erro.
 12. Os testes não dependem do relógio do computador para passar, mas se a máquina suspender no meio de uma rodada os tempos estouram ("Hook timed out"): rode de novo.
 13. Os arquivos do repositório usam CRLF; ao editar por script, preserve as quebras de linha.
+14. **Usuário se desativa, nunca se apaga.** `historico` e `acessos_dados_pessoais` guardam quem fez cada ação, e o banco recusa apagar quem tem registro. Pela tela de Usuários, só desativar.
+15. **Cliente não se apaga: anonimiza-se**, só pelo Administrador (tela LGPD), depois do prazo de guarda (`PRAZO_DE_GUARDA_ANOS` em `packages/shared/src/lgpd.ts`) e sem pedido em andamento. É a única exceção à regra de não alterar o histórico (constituição, princípio III).
 
 ## Mensagens e erros
 Erros da API: 400 dados inválidos, 401 sem login, 403 sem permissão, 404 não encontrado, 409 conflito. Texto sempre em português claro, para quem trabalha na fábrica.
@@ -58,6 +64,6 @@ Erros da API: 400 dados inválidos, 401 sem login, 403 sem permissão, 404 não 
 ## Estado da implantação (o que ainda não foi verificado)
 Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e a migração `001_financeiro` aplicados; login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
 
-**A Etapa 2 (catálogo, preço no servidor, orçamento, Quadro e a aba Preços) existe no código e nos testes, mas NÃO foi publicada:** falta aplicar `db/migracoes/002_catalogo.sql` e depois `003_precos.sql` no SQL Editor do Supabase e então publicar a API e a interface (nessa ordem). Publicar a API antes das migrações quebra a criação de pedidos e o login (o perfil passa a ler `gerencia_precos`).
+**A Etapa 2 (catálogo, preço no servidor, orçamento, Quadro e a aba Preços) existe no código e nos testes, mas NÃO foi publicada:** falta aplicar `db/migracoes/002_catalogo.sql`, depois `003_precos.sql`, `004_acessos.sql` e `005_exclusao.sql` no SQL Editor do Supabase e então publicar a API e a interface (nessa ordem). Publicar a API antes das migrações quebra a criação de pedidos e o login (o perfil passa a ler `gerencia_precos`) a ficha e o orçamento (gravam em `acessos_dados_pessoais`) e a busca de clientes (filtra `clientes.anonimizado_em`).
 
 Ainda não rodou contra o banco real: R2/fotos e comprovantes (R2 desativado), o Financeiro com dados reais, e a criação de usuários pela tela (falta o segredo `SUPABASE_SERVICE_ROLE_KEY` no Worker). Os testes usam Postgres em memória. Ver "Pendências" em `docs/TECNOLOGIAS.md`.
