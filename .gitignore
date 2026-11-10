@@ -31,3 +31,6 @@ node_modules/
 # Task files
 # tasks.json
 # tasks/ 
+
+# Ferramenta de analise de codigo (local)
+.serena/

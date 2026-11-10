@@ -12,5 +12,5 @@ insert into public.lotes (tipo, descricao, quantidade, prioridade, data_entrega,
 -- insert into public.perfis (id, nome, email, papel)        select id, 'Atendimento (teste)', email, 'atendimento' from auth.users where email = 'atendimento@teste.com';
 -- insert into public.perfis (id, nome, email, papel, setor) select id, 'Maria', email, 'setor', 'Impressão' from auth.users where email = 'impressao@teste.com';
 -- insert into public.perfis (id, nome, email, papel)        select id, 'Direção (teste)', email, 'direcao' from auth.users where email = 'direcao@teste.com';
--- O primeiro administrador entra por aqui; os demais usuários o administrador cria pela tela "Usuários".
--- insert into public.perfis (id, nome, email, papel)        select id, 'Administrador', email, 'admin' from auth.users where email = 'admin@teste.com';
+-- O primeiro administrador NÃO se cria por aqui: use o script, que pede a senha sem mostrar e cria login e perfil juntos
+-- (`npm run criar-admin -w apps/api -- pessoa@empresa.com`, ver README). Os demais o administrador cria pela tela "Usuários".

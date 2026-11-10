@@ -19,6 +19,7 @@ npm run dev:local                 # API local (8787) com banco em memória e dad
 npm run dev:web                   # interface (5173) sem apps/web/.env, depois "entrar" pelo console (ver README)
 npm run dev:demo                  # interface em modo demonstração: login de um toque por setor (senha "demo"); só com dev:local
 npm run deploy -w apps/web        # build + wrangler deploy da interface
+npm run criar-admin -w apps/api -- pessoa@empresa.com  # primeiro Administrador (ou recuperação): pede senha e segredos sem mostrar; rodar no PowerShell
 ```
 Todo trabalho termina com `npm test`, `npm run typecheck` e `npm run build -w apps/web` verdes.
 
@@ -62,11 +63,13 @@ awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' w
 Erros da API: 400 dados inválidos, 401 sem login, 403 sem permissão, 404 não encontrado, 409 conflito. Texto sempre em português claro, para quem trabalha na fábrica.
 
 ## Estado da implantação (o que ainda não foi verificado)
-Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e as migrações `001` a `005` aplicados (002 a 005 em 09/11/2026, pelo conector MCP do Supabase, registradas em `supabase_migrations`); login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
+Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e as migrações `001` a `006` aplicados (002 a 006 em 09/11/2026, pelo conector MCP do Supabase, registradas em `supabase_migrations`); login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
 
 **Publicado em 09/11/2026:** a Etapa 2 (catálogo, preço no servidor, orçamento, Quadro, aba Preços) e as mudanças de 05 a 09/11 (permissões da Direção, registro de acessos LGPD, pedido de exclusão), na API (versão `26ed94c2`) e na interface (versão `0a0637eb`). Conferido sem login: `/health` 200, rotas protegidas 401, pré-voo CORS 204, login abre sem modo demonstração. Falta conferir com um usuário real (pedido novo, Financeiro, Quadro, LGPD).
 
-**Não publicado:** a edição de usuários (RF-04: `POST /usuarios/:id`, `GET /usuarios/:id/alteracoes`) depende da migração `006_alteracoes_usuarios.sql`, que ainda não foi aplicada no Supabase. Publicar a API antes dela quebra a edição de usuários.
+**Publicado em 09/11/2026 (2ª vez):** a edição de usuários (RF-04: `POST /usuarios/:id`, `GET /usuarios/:id/alteracoes`), com a migração `006_alteracoes_usuarios.sql` aplicada antes (conferida: tabela, RLS, 2 gatilhos, sem acesso para `anon`/`authenticated`). API versão `09e1fb29`, interface versão `a84f4003`, publicadas do ramo `001-editar-usuarios`. Conferido sem login: `/health` 200, rotas novas 401, pré-voo CORS 204, interface sem modo demonstração. Falta conferir a edição com o Administrador real.
+
+**Verificado em 09/11/2026:** o script `criar-admin` criou um Administrador no Supabase real (login e perfil `admin`, e-mail confirmado), e ele entrou no sistema publicado.
 
 Ainda não rodou contra o banco real: R2/fotos e comprovantes (R2 desativado), o Financeiro com dados reais, e a criação de usuários pela tela (falta o segredo `SUPABASE_SERVICE_ROLE_KEY` no Worker). Os testes usam Postgres em memória. Ver "Pendências" em `docs/TECNOLOGIAS.md`.
 

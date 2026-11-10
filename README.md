@@ -18,7 +18,11 @@ db/              schema.sql (RLS fechado) e seeds
 - Telas conferidas no navegador contra a API local com dados de exemplo (`npm run dev:local`): Laser, Design, Atendimento, Direção e Impressão, inclusive em tela de celular.
 
 ## O que ainda precisa de contas reais
-1. **Supabase:** criar o projeto, rodar `db/schema.sql` e `db/seed.sql`, criar usuários em Authentication e cadastrar os perfis (comentários no fim do `seed.sql`).
+1. **Supabase:** criar o projeto, rodar `db/schema.sql`, as migrações de `db/migracoes/` em ordem e `db/seed.sql`. O **primeiro Administrador** se cria pelo terminal (no PowerShell, que esconde a senha):
+   ```bash
+   npm run criar-admin -w apps/api -- pessoa@mafardamentos.com
+   ```
+   O script pede o nome, a senha inicial (duas vezes, sem aparecer), a chave secreta do Supabase (Configurações do projeto > Chaves de API > `sb_secret_...`) e o endereço de conexão do banco (Database > Connect, com a senha do banco). Os dois segredos também podem vir de `SUPABASE_SERVICE_ROLE_KEY` e `DATABASE_URL`. Nada fica gravado. E-mail que já existe é recusado. Serve também para recuperar o acesso se o único Administrador perder o seu. Depois, troque a senha inicial e ligue a verificação em duas etapas no e-mail dessa pessoa: quem controla a caixa de entrada controla o sistema. Os demais usuários o Administrador cria pela tela Usuários.
 2. **Cloudflare:** `powershell -File ..\..\scripts\criar-hyperdrive.ps1` dentro de `apps/api` (usa a Session pooler do Supabase, porta 5432, com cache desligado e a senha pedida sem eco) e colocar o id em `apps/api/wrangler.toml`; ajustar `SUPABASE_URL`. Criar também o balde das fotos: `npx wrangler r2 bucket create pcp-ma-arquivos`.
 3. **Chaves** (nunca no git): `apps/web/.env` (veja `.env.example`). A API valida o login com as chaves públicas do Supabase e não guarda segredos no código. Só a tela de Usuários do Administrador precisa da chave de administrador: `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY` (nunca em arquivo nem no chat).
 4. **Medir:** tempo de "concluir etapa" com o Supabase em duas regiões (São Paulo e EUA leste) e decidir a região.

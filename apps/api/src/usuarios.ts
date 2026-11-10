@@ -34,7 +34,14 @@ export async function criarUsuario(
   body: UsuarioBody,
 ): Promise<{ ok: true; id: string } | Falha> {
   if (!gerenciaUsuarios(perfil)) return SO_ADMIN;
+  return criarAcesso(db, auth, body);
+}
 
+/**
+ * Cria o login e o perfil, sem conferir quem pede: a tela de Usuários confere antes (`criarUsuario`), e o script
+ * `criar-admin.ts` é rodado por quem tem a chave secreta do Supabase e a senha do banco (o primeiro Administrador).
+ */
+export async function criarAcesso(db: Db, auth: AdminAuth, body: UsuarioBody): Promise<{ ok: true; id: string } | Falha> {
   const [igual] = await db.query<{ nome: string }>('select nome from perfis where lower(email) = $1', [body.email]);
   if (igual) return { ok: false, status: 409, erro: `Já existe um usuário com este e-mail: ${igual.nome}.` };
 
