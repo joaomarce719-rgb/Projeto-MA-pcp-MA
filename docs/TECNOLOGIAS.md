@@ -258,7 +258,7 @@ Em 23/10/2026 o projeto foi atualizado para as versões atuais do registro do np
 
 - [x] Rodar contra um Supabase e uma Cloudflare reais (feito em 26/10/2026, São Paulo; números na seção do Hyperdrive). Falta: medir uma segunda região, exercitar contra o banco real as rotas de clientes, pedidos, ficha e devolver (só passaram com Postgres em memória) e a Admin API (criar usuário com a chave `sb_secret_`).
 - [x] Aplicar `db/migracoes/006_alteracoes_usuarios.sql` no Supabase real (09/11/2026, pelo conector MCP).
-- [ ] Aplicar `db/migracoes/007_faixas_de_preco.sql` (faixas de preço por produto) no Supabase real e publicar a API logo em seguida, sem alterar preços no intervalo; depois a interface (ramo `002-faixas-de-preco`).
+- [x] Faixas de preço por produto publicadas em 11/11/2026: migração 007, API `452b45f6` e interface `0c00a34a`.
 - [x] Publicar API (`09e1fb29`) e interface (`a84f4003`) com a edição de usuários (RF-04), em 09/11/2026.
 - [ ] Terminar a Etapa 1: decidir com a MA as cores do pedido e os limites das fotos (D14 e D15). O que falta do plano depende do catálogo e dos preços (Etapa 2): valor a receber, malha do calção, orçamento do pedido.
 - [x] Confirmar o postgres.js atrás do Hyperdrive e a chave de login assimétrica do projeto (ES256; feito em 26/10/2026).

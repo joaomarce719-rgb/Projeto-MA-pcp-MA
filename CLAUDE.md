@@ -63,7 +63,7 @@ awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' w
 Erros da API: 400 dados inválidos, 401 sem login, 403 sem permissão, 404 não encontrado, 409 conflito. Texto sempre em português claro, para quem trabalha na fábrica.
 
 ## Estado da implantação (o que ainda não foi verificado)
-Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e as migrações `001` a `006` aplicados (002 a 006 em 09/11/2026, pelo conector MCP do Supabase, registradas em `supabase_migrations`); login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
+Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real): `schema.sql` e as migrações `001` a `007` aplicados (002 a 006 em 09/11/2026 e 007 em 11/11/2026, pelo conector MCP do Supabase, registradas em `supabase_migrations`); login ES256. Interface em `https://pcp-ma.mafardamentos.workers.dev`; Worker `pcp-ma-api` em `https://pcp-ma-api.mafardamentos.workers.dev` (Hyperdrive `pcp-ma`, cache desligado, Session pooler, **sem R2**).
 
 **Publicado em 09/11/2026:** a Etapa 2 (catálogo, preço no servidor, orçamento, Quadro, aba Preços) e as mudanças de 05 a 09/11 (permissões da Direção, registro de acessos LGPD, pedido de exclusão), na API (versão `26ed94c2`) e na interface (versão `0a0637eb`). Conferido sem login: `/health` 200, rotas protegidas 401, pré-voo CORS 204, login abre sem modo demonstração. Falta conferir com um usuário real (pedido novo, Financeiro, Quadro, LGPD).
 
@@ -71,7 +71,7 @@ Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real
 
 **Verificado em 09/11/2026:** o script `criar-admin` criou um Administrador no Supabase real (login e perfil `admin`, e-mail confirmado), e ele entrou no sistema publicado.
 
-**Não publicado:** as faixas de preço por produto (ramo `002-faixas-de-preco`) dependem da migração `007_faixas_de_preco.sql`, ainda não aplicada no Supabase. Publicar a API antes dela quebra o catálogo, os preços e a criação de pedidos; publicar depois, com intervalo, deixa a API antiga gravando preços sem faixas. Rode a migração e publique a API em seguida, sem mexer na aba Preços entre os dois.
+**Publicado em 11/11/2026:** as faixas de preço por produto (RN-07 e RN-08), do ramo `002-faixas-de-preco`: migração `007_faixas_de_preco.sql` aplicada e conferida (os 46 produtos com as faixas iguais aos preços antigos), API versão `452b45f6` publicada logo em seguida, interface versão `0c00a34a`. Conferido sem login: `/health` 200, `/catalogo` e `/precos` 401, pré-voo CORS 204, interface com a tabela de faixas e sem modo demonstração. Falta conferir com um usuário real (editar faixas e abrir um pedido).
 
 Ainda não rodou contra o banco real: R2/fotos e comprovantes (R2 desativado), o Financeiro com dados reais, e a criação de usuários pela tela (falta o segredo `SUPABASE_SERVICE_ROLE_KEY` no Worker). Os testes usam Postgres em memória. Ver "Pendências" em `docs/TECNOLOGIAS.md`.
 
