@@ -129,7 +129,7 @@ Atendimento (abre o pedido, com orçamento e entrada)
 | RF-31 | Listar em "Atenção" os pedidos atrasados e os em recuperação, com o motivo. |
 | RF-32 | Mostrar o gráfico de peças por setor. |
 | RF-33 | Abrir a ficha de qualquer pedido em modo leitura, com a linha do tempo completa. |
-| RF-34 | Aba **Preços**: quem tem a permissão (Administrador e o Atendimento escolhido) busca os produtos, cria um produto novo (nome, malha, preço de 10 peças ou mais e de menos de 10), altera nome, malha e preços e ativa ou desativa o produto. A mudança vale para os pedidos novos; os pedidos já abertos mantêm o preço do dia. O Administrador dá ou tira a permissão na tela de Usuários. |
+| RF-34 | Aba **Preços**: quem tem a permissão (Administrador e o Atendimento escolhido) busca os produtos, cria um produto novo (nome, malha e as faixas de preço por quantidade), altera nome, malha e faixas e ativa ou desativa o produto. A mudança vale para os pedidos novos; os pedidos já abertos mantêm o preço do dia. O Administrador dá ou tira a permissão na tela de Usuários. |
 
 ## 6. Regras de negócio
 
@@ -146,7 +146,7 @@ Atendimento (abre o pedido, com orçamento e entrada)
 ### Preço
 | ID | Regra |
 |---|---|
-| RN-07 | O preço unitário vem do catálogo pela faixa do produto: 10 peças ou mais usa o preço menor, menos de 10 usa o maior. Exemplo: camisa adulto helanca custa R$ 30,00 com 10 ou mais e R$ 36,00 com menos. |
+| RN-07 | O preço unitário vem do catálogo pela faixa de quantidade do produto. Cada produto tem de 1 a 5 faixas ("a partir de N peças, R$ X por peça"): a primeira começa em 1, as quantidades crescem e o preço não sobe quando a quantidade sobe. Uma faixa só = preço único. Exemplo: camisa a R$ 42,00 de 1 a 9, R$ 38,00 de 10 a 19 e R$ 35,00 a partir de 20. Quem gerencia preços muda as faixas na aba Preços (decisão de 10/11/2026; antes a divisa era fixa em 10 peças). |
 | RN-08 | A faixa é contada por produto do pedido, não pelo pedido inteiro. (Pendente de confirmação, D6.) |
 | RN-09 | Os adicionais somam ao unitário de todas as peças do produto: patch R$ 7,00, punho R$ 5,00, gola V R$ 2,00. |
 | RN-10 | Subtotal = peças × (preço da faixa + adicionais). Total = soma dos subtotais, arredondado em centavos. |
@@ -328,7 +328,7 @@ Princípios:
 | RF-07 | Feito | Setor atual, trilha por etapa (Bordado riscado quando não se aplica), etapas feitas e faltantes (`progressoDoPedido`), prazo, selo e motivo da recuperação, peças e o saldo ou "quitado" (valores só para atendimento e admin) |
 | RF-08 | Parcial | Ficha em `components/Ficha.tsx` e `GET /lotes/:id`, com bloco de valores e recebimentos na linha do tempo (atendimento, direção e admin). Falta a malha por produto e a do calção (Etapa 2) |
 | RF-09 | Feito | `pages/NovoPedido.tsx`, `clientes.ts` |
-| RF-10 | Feito | Passo 2 de `pages/NovoPedido.tsx`: busca no catálogo de 46 produtos (tabela `produtos`, migração 002), grade adulta ou infantil conforme o produto, adicionais, faixa de 10 peças por produto (D6), subtotal e total calculados pela API (`pedidos.ts`, `shared/src/orcamento.ts`) e copiados para o item no dia do pedido |
+| RF-10 | Feito | Passo 2 de `pages/NovoPedido.tsx`: busca no catálogo de 46 produtos (tabela `produtos`, migração 002), grade adulta ou infantil conforme o produto, adicionais, faixas de preço por produto (RN-07, migração 007; D6), subtotal e total calculados pela API (`pedidos.ts`, `shared/src/orcamento.ts`) e copiados para o item no dia do pedido |
 | RF-11 | Parcial | Prioridade, entrega, bordado, punho, detalhes, fotos, prévia da rota e malha do calção (vem dos produtos de calção, bermuda ou calça); as cores perdem a função com fotos reais (decisão D14) |
 | RF-12 | Feito | Passo 4: resumo com preços, valor total calculado, entrada sugerida de 50%, forma de pagamento, comprovante e prévia do orçamento |
 | RF-13 | Feito | Validação por passo com as mesmas regras do servidor |
@@ -345,7 +345,7 @@ Princípios:
 | RF-25 a RF-28 | Feito | `pages/Financeiro.tsx`, `financeiro.ts`, rotas `GET /financeiro`, `POST /lotes/:id/recebimentos`, `POST /lotes/:id/entregar`, comprovantes em `/recebimentos/:id/comprovante`. Atendimento, Direção e Administrador registram; o setor não tem acesso. O comprovante precisa do R2 ativo (ainda não está) |
 | RF-29 a RF-32 | Feito | `pages/Quadro.tsx`, `quadro.ts`, regra em `shared/src/quadro.ts`, rota `GET /quadro` (direção e admin): 6 indicadores, uma coluna por setor mais Financeiro e Concluídos hoje, lista "Atenção" e gráfico de peças por setor |
 | RF-33 | Feito | A Direção abre a ficha pelo quadro, com a linha do tempo primeiro e os valores |
-| RF-34 | Feito | `pages/Precos.tsx`; rotas `GET /precos`, `POST /precos`, `POST /precos/:id` e `POST /usuarios/:id/precos` (só o Administrador dá a permissão). Preços entre R$ 0,01 e R$ 10.000,00 por peça; o preço de 10 peças ou mais não passa o de menos de 10; nome repetido dá 409 |
+| RF-34 | Feito | `pages/Precos.tsx`; rotas `GET /precos`, `POST /precos`, `POST /precos/:id` e `POST /usuarios/:id/precos` (só o Administrador dá a permissão). Preços entre R$ 0,01 e R$ 10.000,00 por peça, em 1 a 5 faixas por quantidade (`faixasBody`: começa em 1, quantidades crescentes, preço que não sobe); nome repetido dá 409 |
 
 ### Regras de negócio
 

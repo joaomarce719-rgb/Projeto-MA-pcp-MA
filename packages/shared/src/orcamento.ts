@@ -1,6 +1,6 @@
 import type { Adicionais, Grade, ModoGrade } from './pedido';
 import { TAMANHOS } from './pedido';
-import { ADICIONAIS_CENTAVOS, formatarReais, subtotalCentavos, unitarioCentavos, precoBaseCentavos, type ItemPreco } from './preco';
+import { ADICIONAIS_CENTAVOS, formatarReais, subtotalCentavos, unitarioCentavos, precoBaseCentavos, type FaixaDePreco, type ItemPreco } from './preco';
 
 /** Produtos de calção, bermuda ou calça: a malha do calção do pedido vem deles (RF-20), não é escolhida à parte. */
 const PRODUTO_DE_CALCAO = /^(CALÇÃO|BERMUDA|CALÇA)/;
@@ -33,9 +33,6 @@ export function tituloDoProduto(texto: string): string {
 
 /** Produtos infantis usam a grade infantil (2 a 14); os demais, a adulta. */
 export const modoDoProduto = (nome: string): ModoGrade => (/INFANTIL/.test(nome.toUpperCase()) ? 'infantil' : 'adulto');
-
-/** A faixa de preço (RN-07 e RN-08, contada por produto — D6): 10 peças ou mais pagam o preço menor por peça. */
-export const FAIXA_DE_PECAS = 10;
 
 export interface ItemPrecificado {
   quantidade: number;
@@ -119,11 +116,10 @@ export function mensagemDoOrcamento(o: OrcamentoDoPedido): string {
   return linhas.join('\n');
 }
 
-/** Um produto do catálogo, com os preços por peça em centavos (faixa de 10 peças ou mais, e de menos de 10). */
+/** Um produto do catálogo, com as faixas de preço por peça em centavos (RN-07 e RN-08). */
 export interface ProdutoDoCatalogo {
   id: string;
   nome: string;
   malha: string;
-  maiorCentavos: number;
-  menorCentavos: number;
+  faixas: FaixaDePreco[];
 }

@@ -263,7 +263,14 @@ textarea.wpp { width: 100%; min-height: 220px; font: inherit; line-height: 1.45;
 .barra-busca button { flex: 0 0 auto; white-space: nowrap; margin: 0; }
 .produto.desativado { opacity: 0.65; }
 .produto p { margin: 4px 0 8px; }
-.precos-do-produto { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 10px; }
+.precos-do-produto { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 0 0 10px; }
+.faixas { border: 1px solid var(--borda, #d9dee5); border-radius: 12px; padding: 10px 12px 12px; margin: 14px 0 6px; }
+.faixas legend { font-weight: 600; padding: 0 4px; }
+.faixa { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px 10px; align-items: end; margin-top: 10px; }
+.faixa label { grid-row: 1; margin: 0; font-size: 13px; }
+.faixa input { grid-row: 2; }
+.faixa button { grid-row: 2; }
+@media (max-width: 420px) { .faixa { grid-template-columns: 1fr 1fr; } .faixa button { grid-column: 1 / -1; grid-row: 3; } }
 .precos-do-produto small { display: block; color: var(--mudo, #5b6573); font-size: 12.5px; }
 .precos-do-produto strong { font-size: 19px; }
 label.marcar { display: flex; align-items: center; gap: 10px; font-weight: 600; }

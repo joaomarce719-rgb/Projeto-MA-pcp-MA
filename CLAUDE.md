@@ -23,9 +23,9 @@ npm run criar-admin -w apps/api -- pessoa@empresa.com  # primeiro Administrador 
 ```
 Todo trabalho termina com `npm test`, `npm run typecheck` e `npm run build -w apps/web` verdes.
 
-Antes de publicar a API, confira no SQL Editor do Supabase que todas as migrações de `db/migracoes/` rodaram; a mais recente é a 006 (se der `false`, rode as que faltam antes):
+Antes de publicar a API, confira no SQL Editor do Supabase que todas as migrações de `db/migracoes/` rodaram; a mais recente é a 007 (se der `false`, rode as que faltam antes):
 ```sql
-select to_regclass('public.alteracoes_usuarios') is not null as pode_publicar;
+select exists (select 1 from information_schema.columns where table_name = 'produtos' and column_name = 'faixas') as pode_publicar;
 ```
 Deploy da API (o R2 ainda não está ativo, então se usa um `wrangler.toml` temporário sem `[[r2_buckets]]`; rodar em `apps/api`):
 ```bash
@@ -36,7 +36,7 @@ awk '/^# Balde das fotos/{skip=1} skip&&/^# Criado com scripts/{skip=0} !skip' w
 ## Arquitetura (visão geral)
 - **`packages/shared`** é a fonte única das regras: rota dos setores (`rota.ts`), prazo, preço/orçamento (`preco.ts`, `orcamento.ts`), pagamento (`pagamento.ts`), quadro da Direção (`quadro.ts`), quem vê valores e registra pagamentos (`permissoes.ts`: `veValores`, `registraPagamentos`, `veDadosPessoais`, `abrePedidos`, `veQuadro`, `gerenciaUsuarios`) e os esquemas Zod dos corpos e respostas (`schemas.ts`, `pedido.ts`). API e interface importam as mesmas funções (`@pcp/shared`); mudar uma regra aqui muda os dois lados.
 - **`apps/api`** (Hono): `app.ts` monta as rotas e o middleware `autenticar`, ligado em toda rota menos `/health` (um teste percorre todas). `auth.ts` valida o JWT do Supabase (ES256 via JWKS, `jose`) e **só extrai o usuário**; papel e setor são lidos da tabela `perfis` a cada requisição. Cada rota fica em um módulo (`fila`, `ficha`, `pedidos`, `concluir`, `devolver`, `financeiro`, `orcamento`, `catalogo`, `quadro`, `precos`, `fotos`, `usuarios`) que confere a permissão e filtra as colunas (setor sem valores nem dados do cliente). `db.ts` abre o postgres.js pelo Hyperdrive; `armazenamento.ts` fala com o R2; `adminAuth.ts` chama a Admin API do Supabase (só a tela de Usuários).
-- **O preço é calculado só no servidor** (`pedidos.ts`): produto do catálogo (`produtos`), faixa de 10 peças, adicionais por peça; o preço do dia é copiado para `itens_pedido` (a mudança de preço depois não altera pedidos antigos). Quem altera produtos e preços é o Administrador, a Direção ou o Atendimento com `perfis.gerencia_precos` (regra `podeGerenciarPrecos` em `@pcp/shared`, conferida na API).
+- **O preço é calculado só no servidor** (`pedidos.ts`): produto do catálogo (`produtos`), faixas de preço por quantidade de cada produto (`produtos.faixas`, `precoDaFaixa`), adicionais por peça; o preço do dia é copiado para `itens_pedido` (a mudança de preço depois não altera pedidos antigos). Quem altera produtos e preços é o Administrador, a Direção ou o Atendimento com `perfis.gerencia_precos` (regra `podeGerenciarPrecos` em `@pcp/shared`, conferida na API).
 - **`apps/web`**: Vite + React 19, TanStack Router (`router.tsx` monta o menu por papel; a Direção vê Pedidos, Quadro, Financeiro e Preços) e TanStack Query (`api.ts` concentra as chamadas). Supabase só faz o login; dados vêm sempre da API.
 - **Banco** (`db/`): RLS ligado, sem políticas e sem acesso para `anon`/`authenticated` (a Data API está desligada); só a API, pelo Hyperdrive, lê e grava.
 - **Testes de API** (`test-support.ts`): sobem um PGlite novo, aplicam `schema.sql` e todas as `db/migracoes/*.sql` em ordem e criam a app com usuários e lotes de exemplo. `dev-local.ts` reaproveita isso para o modo demonstração (o token de demonstração é o id do usuário e só essa API local o aceita; o build de produção não inclui o modo demo).
@@ -70,6 +70,8 @@ Supabase `pcp-ma` (São Paulo, plano Free só para testes; Pro antes de uso real
 **Publicado em 09/11/2026 (2ª vez):** a edição de usuários (RF-04: `POST /usuarios/:id`, `GET /usuarios/:id/alteracoes`), com a migração `006_alteracoes_usuarios.sql` aplicada antes (conferida: tabela, RLS, 2 gatilhos, sem acesso para `anon`/`authenticated`). API versão `09e1fb29`, interface versão `a84f4003`, publicadas do ramo `001-editar-usuarios`. Conferido sem login: `/health` 200, rotas novas 401, pré-voo CORS 204, interface sem modo demonstração. Falta conferir a edição com o Administrador real.
 
 **Verificado em 09/11/2026:** o script `criar-admin` criou um Administrador no Supabase real (login e perfil `admin`, e-mail confirmado), e ele entrou no sistema publicado.
+
+**Não publicado:** as faixas de preço por produto (ramo `002-faixas-de-preco`) dependem da migração `007_faixas_de_preco.sql`, ainda não aplicada no Supabase. Publicar a API antes dela quebra o catálogo, os preços e a criação de pedidos; publicar depois, com intervalo, deixa a API antiga gravando preços sem faixas. Rode a migração e publique a API em seguida, sem mexer na aba Preços entre os dois.
 
 Ainda não rodou contra o banco real: R2/fotos e comprovantes (R2 desativado), o Financeiro com dados reais, e a criação de usuários pela tela (falta o segredo `SUPABASE_SERVICE_ROLE_KEY` no Worker). Os testes usam Postgres em memória. Ver "Pendências" em `docs/TECNOLOGIAS.md`.
 

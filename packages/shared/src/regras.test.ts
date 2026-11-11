@@ -72,7 +72,7 @@ describe('o que cada setor informa para concluir', () => {
 });
 
 describe('preço', () => {
-  const camisa = { maiorCentavos: 3000, menorCentavos: 3600, adicionais: {} };
+  const camisa = { faixas: [{ aPartirDe: 1, centavos: 3600 }, { aPartirDe: 10, centavos: 3000 }], adicionais: {} };
 
   it('RN-07: 10 peças ou mais usa o preço menor; menos de 10 usa o maior', () => {
     expect(subtotalCentavos({ ...camisa, quantidade: 10 })).toBe(30000);
@@ -86,7 +86,7 @@ describe('preço', () => {
 
   it('RN-10: o total é a soma dos subtotais', () => {
     const a = { ...camisa, quantidade: 10 };
-    const b = { maiorCentavos: 4000, menorCentavos: 4800, quantidade: 5, adicionais: { golaV: true } };
+    const b = { faixas: [{ aPartirDe: 1, centavos: 4800 }, { aPartirDe: 10, centavos: 4000 }], quantidade: 5, adicionais: { golaV: true } };
     expect(totalCentavos([a, b])).toBe(30000 + 5 * (4800 + 200));
   });
 });

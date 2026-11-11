@@ -129,7 +129,7 @@ export function FolhaDoOrcamento({ dados: o, previa = false }: { dados: Orcament
       </table>
 
       <footer className="mudo">
-        <strong>Válido por 30 dias.</strong> Preço por faixa: 10 peças ou mais, ou menos de 10 peças, por produto. Adicionais cobrados por peça.
+        <strong>Válido por 30 dias.</strong> Preço por peça conforme a quantidade de cada produto. Adicionais cobrados por peça.
       </footer>
     </article>
   );

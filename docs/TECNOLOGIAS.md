@@ -80,10 +80,10 @@ pcp-ma/
 | `POST /usuarios/:id` | Admin | Edita nome, papel e setor (`edicaoUsuarioBody`); não muda e-mail, senha nem situação. Grava o que mudou em `alteracoes_usuarios` na mesma transação; sem mudança, não grava. Sair do Atendimento zera `gerencia_precos`. O Administrador mudando o próprio papel: 409 |
 | `GET /usuarios/:id/alteracoes` | Admin | Alterações do usuário, a mais recente primeiro: quando, quem alterou, antes e depois |
 | `POST /usuarios/:id/precos` | Admin | Dá ou tira (`gerenciaPrecos`) a permissão de gerenciar preços. Só vale para o Atendimento (400 para os outros); o banco também recusa |
-| `GET /catalogo` | Atendimento, direção e admin | Os produtos ativos com a malha e os dois preços por peça, em centavos. Setor: 403 |
-| `GET /precos` | Admin, direção e Atendimento com permissão | Todos os produtos, ativos e desativados, com os dois preços, a data e quem alterou por último. Os outros: 403 |
+| `GET /catalogo` | Atendimento, direção e admin | Os produtos ativos com a malha e as faixas de preço (`faixas`: `[{aPartirDe, centavos}]`, migração 007). Setor: 403 |
+| `GET /precos` | Admin, direção e Atendimento com permissão | Todos os produtos, ativos e desativados, com as faixas de preço, a data e quem alterou por último. Os outros: 403 |
 | `POST /precos` | Admin, direção e Atendimento com permissão | Cria um produto (nome e malha em maiúsculas; 409 se o nome já existe) |
-| `POST /precos/:id` | Admin, direção e Atendimento com permissão | Altera nome, malha, preços e se está ativo. A escrita é por POST porque o CORS da API só libera GET e POST |
+| `POST /precos/:id` | Admin, direção e Atendimento com permissão | Altera nome, malha, faixas de preço e se está ativo. Grava também as colunas antigas (`preco_menor_centavos` = primeira faixa, `preco_maior_centavos` = última), para a versão anterior da API continuar lendo preços durante a publicação (ela não grava faixas: publique a API logo depois da migração 007 e não mexa na aba Preços no intervalo). A escrita é por POST porque o CORS da API só libera GET e POST |
 | `GET /lotes/:id/orcamento` | Atendimento, direção e admin (setor: 403) | Dados do orçamento de um pedido de Cliente (cliente, itens com o preço do dia, total, recebimentos, saldo). Feira: 400 |
 | `GET /quadro` | Direção e admin | Quadro só de leitura: 6 indicadores, colunas por setor (mais Financeiro e Concluídos hoje), pedidos que pedem atenção (atrasados e recuperações) e totais em centavos. Montado por `montarQuadro` (`packages/shared`). Outros perfis: 403 |
 | `GET /financeiro` | Atendimento, direção e admin | Recebido hoje, 7 dias e mês, total a receber, e os pedidos de Cliente em Financeiro com total, recebido, saldo, percentual e recebimentos. Setor: 403. Registrar recebimento e confirmar entrega: atendimento, direção e admin |
@@ -130,7 +130,7 @@ Se duas pessoas (ou dois cliques) tentam concluir o mesmo pedido, só a primeira
 - **Não usados por ora:** TanStack Table e TanStack Form, porque as telas atuais não precisam deles.
 
 ### Zod e o pacote `@pcp/shared`
-- **O que faz:** guarda as regras que precisam ser iguais na tela e na API: ordem dos setores (com e sem bordado), o que cada setor informa, cálculo de preço por faixa (10 peças ou mais), leitura de valores no formato brasileiro, dia em Fortaleza e semáforo de prazo. Valores em centavos, para não acumular erro de arredondamento.
+- **O que faz:** guarda as regras que precisam ser iguais na tela e na API: ordem dos setores (com e sem bordado), o que cada setor informa, cálculo de preço pelas faixas de quantidade de cada produto (`precoDaFaixa`), leitura de valores no formato brasileiro, dia em Fortaleza e semáforo de prazo. Valores em centavos, para não acumular erro de arredondamento.
 - **No projeto:** `packages/shared/src`, com 26 testes. Zod 4 (a versão 3 tinha um alerta alto de consumo de memória em 23/10/2026).
 
 ### Hono nos Cloudflare Workers
@@ -258,6 +258,7 @@ Em 23/10/2026 o projeto foi atualizado para as versões atuais do registro do np
 
 - [x] Rodar contra um Supabase e uma Cloudflare reais (feito em 26/10/2026, São Paulo; números na seção do Hyperdrive). Falta: medir uma segunda região, exercitar contra o banco real as rotas de clientes, pedidos, ficha e devolver (só passaram com Postgres em memória) e a Admin API (criar usuário com a chave `sb_secret_`).
 - [x] Aplicar `db/migracoes/006_alteracoes_usuarios.sql` no Supabase real (09/11/2026, pelo conector MCP).
+- [ ] Aplicar `db/migracoes/007_faixas_de_preco.sql` (faixas de preço por produto) no Supabase real e publicar a API logo em seguida, sem alterar preços no intervalo; depois a interface (ramo `002-faixas-de-preco`).
 - [x] Publicar API (`09e1fb29`) e interface (`a84f4003`) com a edição de usuários (RF-04), em 09/11/2026.
 - [ ] Terminar a Etapa 1: decidir com a MA as cores do pedido e os limites das fotos (D14 e D15). O que falta do plano depende do catálogo e dos preços (Etapa 2): valor a receber, malha do calção, orçamento do pedido.
 - [x] Confirmar o postgres.js atrás do Hyperdrive e a chave de login assimétrica do projeto (ES256; feito em 26/10/2026).
