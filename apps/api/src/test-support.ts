@@ -1,3 +1,4 @@
+import { diaEmFortaleza, somarDias } from '@pcp/shared';
 import { readFileSync, readdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { criarApp } from './app';
@@ -170,7 +171,7 @@ export async function criarAmbiente(): Promise<Ambiente> {
           campos.tipo ?? 'Cliente',
           campos.descricao,
           campos.prioridade ?? 'Normal',
-          campos.entrega ?? '2026-11-10',
+          campos.entrega ?? somarDias(diaEmFortaleza(), 7), // no futuro: o teste não pode depender do dia em que roda
           campos.bordado ?? false,
           campos.etapa,
           campos.recuperacao ?? false,

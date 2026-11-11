@@ -5,6 +5,9 @@ import {
   modoDoProduto,
   nomesDosAdicionais,
   precificarItem,
+  precoDaFaixa,
+  proximaFaixa,
+  rotuloDaFaixa,
   resumoDaGrade,
   tituloDoProduto,
   totalCentavos,
@@ -12,7 +15,7 @@ import {
 } from './index';
 
 describe('preço por item (RN-07 a RN-10)', () => {
-  const camisa = { maiorCentavos: 3500, menorCentavos: 4200 };
+  const camisa = { faixas: [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3500 }] };
 
   it('9 peças pagam a faixa de menos de 10; 10 peças pagam a de 10 ou mais', () => {
     expect(precificarItem({ ...camisa, quantidade: 9, adicionais: {} })).toMatchObject({ precoUnitarioCentavos: 4200, subtotalCentavos: 37_800 });
@@ -26,13 +29,50 @@ describe('preço por item (RN-07 a RN-10)', () => {
   });
 
   it('o total do pedido é a soma dos subtotais, em centavos inteiros', () => {
-    const a = { quantidade: 10, maiorCentavos: 3500, menorCentavos: 4200, adicionais: {} };
-    const b = { quantidade: 3, maiorCentavos: 2700, menorCentavos: 3240, adicionais: { punho: true } };
+    const a = { quantidade: 10, faixas: [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3500 }], adicionais: {} };
+    const b = { quantidade: 3, faixas: [{ aPartirDe: 1, centavos: 3240 }, { aPartirDe: 10, centavos: 2700 }], adicionais: { punho: true } };
     expect(totalCentavos([a, b])).toBe(35_000 + 3 * (3240 + 500));
   });
 
+  it('várias faixas: cada quantidade cai na maior faixa que alcança', () => {
+    const faixas = [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3800 }, { aPartirDe: 20, centavos: 3500 }];
+    expect(precoDaFaixa(faixas, 1)).toBe(4200);
+    expect(precoDaFaixa(faixas, 9)).toBe(4200);
+    expect(precoDaFaixa(faixas, 10)).toBe(3800);
+    expect(precoDaFaixa(faixas, 19)).toBe(3800);
+    expect(precoDaFaixa(faixas, 20)).toBe(3500);
+    expect(precoDaFaixa(faixas, 500)).toBe(3500);
+    expect(precificarItem({ faixas, quantidade: 14, adicionais: {} }).subtotalCentavos).toBe(14 * 3800);
+  });
+
+  it('uma faixa só é preço único, qualquer que seja a quantidade', () => {
+    const unico = [{ aPartirDe: 1, centavos: 1800 }];
+    expect(precoDaFaixa(unico, 1)).toBe(1800);
+    expect(precoDaFaixa(unico, 300)).toBe(1800);
+    expect(proximaFaixa(unico, 1)).toBeNull();
+  });
+
+  it('a próxima faixa é a primeira que a quantidade ainda não alcançou', () => {
+    const faixas = [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3800 }, { aPartirDe: 20, centavos: 3500 }];
+    expect(proximaFaixa(faixas, 3)).toEqual({ aPartirDe: 10, centavos: 3800 });
+    expect(proximaFaixa(faixas, 10)).toEqual({ aPartirDe: 20, centavos: 3500 });
+    expect(proximaFaixa(faixas, 20)).toBeNull();
+  });
+
+  it('a próxima faixa pula faixas com o mesmo preço e mostra onde o preço de fato cai', () => {
+    const faixas = [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 4200 }, { aPartirDe: 20, centavos: 3500 }];
+    expect(proximaFaixa(faixas, 5)).toEqual({ aPartirDe: 20, centavos: 3500 });
+  });
+
+  it('o nome de cada faixa, para as telas', () => {
+    const faixas = [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3800 }, { aPartirDe: 20, centavos: 3500 }];
+    expect(faixas.map((_, i) => rotuloDaFaixa(faixas, i))).toEqual(['1 a 9 peças', '10 a 19 peças', '20 peças ou mais']);
+    expect(rotuloDaFaixa([{ aPartirDe: 1, centavos: 1 }, { aPartirDe: 2, centavos: 1 }], 0)).toBe('1 peça');
+    expect(rotuloDaFaixa([{ aPartirDe: 1, centavos: 1800 }], 0)).toBe('Preço único');
+  });
+
   it('a faixa vale por produto, não pelo pedido inteiro (D6)', () => {
-    const peq = precificarItem({ maiorCentavos: 3000, menorCentavos: 3600, quantidade: 6, adicionais: {} });
+    const peq = precificarItem({ faixas: [{ aPartirDe: 1, centavos: 3600 }, { aPartirDe: 10, centavos: 3000 }], quantidade: 6, adicionais: {} });
     expect(peq.precoUnitarioCentavos).toBe(3600);
   });
 });

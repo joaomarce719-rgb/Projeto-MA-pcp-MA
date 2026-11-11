@@ -1,9 +1,21 @@
-import { SENHA_MINIMA, SETORES, gerenciaUsuarios, papeis, usuarioBody, type Papel, type UsuarioLinha } from '@pcp/shared';
+import {
+  SENHA_MINIMA,
+  SETORES,
+  edicaoUsuarioBody,
+  gerenciaUsuarios,
+  papeis,
+  podeEditarUsuario,
+  usuarioBody,
+  type AlteracaoUsuario,
+  type Papel,
+  type UsuarioLinha,
+} from '@pcp/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { ErroApi, api } from '../api';
 import { Janela } from '../components/Janela';
 import { useEu } from '../eu';
+import { quando } from '../formatar';
 
 const NOME_DO_PAPEL: Record<Papel, string> = {
   atendimento: 'Atendimento',
@@ -30,6 +42,8 @@ function Painel({ meuId }: { meuId: string }) {
   const cache = useQueryClient();
   const lista = useQuery({ queryKey: ['usuarios'], queryFn: api.usuarios });
   const [trocando, setTrocando] = useState<UsuarioLinha | null>(null);
+  const [editando, setEditando] = useState<UsuarioLinha | null>(null);
+  const [vendoAlteracoes, setVendoAlteracoes] = useState<UsuarioLinha | null>(null);
   const [erro, setErro] = useState('');
 
   const ativar = useMutation({
@@ -72,6 +86,8 @@ function Painel({ meuId }: { meuId: string }) {
             </div>
             <p className="mudo">{u.email ?? 'sem e-mail cadastrado'}</p>
             <div className="acoes-do-cartao esquerda">
+              <button className="sec" onClick={() => setEditando(u)}>Editar</button>
+              <button className="sec" onClick={() => setVendoAlteracoes(u)}>Alterações</button>
               <button className="sec" onClick={() => setTrocando(u)}>Trocar senha</button>
               {u.papel === 'atendimento' && (
                 <button
@@ -96,7 +112,119 @@ function Painel({ meuId }: { meuId: string }) {
         ))}
       </div>
       {trocando && <TrocarSenha usuario={trocando} aoFechar={() => setTrocando(null)} />}
+      {editando && <EditarUsuario usuario={editando} meuId={meuId} aoFechar={() => setEditando(null)} />}
+      {vendoAlteracoes && <Alteracoes usuario={vendoAlteracoes} aoFechar={() => setVendoAlteracoes(null)} />}
     </>
+  );
+}
+
+const NOME_DO_CAMPO: Record<string, string> = { nome: 'Nome', papel: 'Perfil', setor: 'Setor', gerenciaPrecos: 'Gerencia preços' };
+
+function valorLegivel(campo: string, valor: unknown): string {
+  if (valor === null || valor === undefined || valor === '') return '(nenhum)';
+  if (campo === 'papel') return NOME_DO_PAPEL[valor as Papel] ?? String(valor);
+  if (campo === 'gerenciaPrecos') return valor ? 'sim' : 'não';
+  return String(valor);
+}
+
+/** RF-04: quem mudou o quê neste usuário, a mais recente primeiro. */
+function Alteracoes({ usuario, aoFechar }: { usuario: UsuarioLinha; aoFechar: () => void }) {
+  const lista = useQuery({ queryKey: ['alteracoes', usuario.id], queryFn: () => api.alteracoesUsuario(usuario.id) });
+  const linhas = (a: AlteracaoUsuario) =>
+    Object.keys(a.depois).map((campo) => (
+      <li key={campo}>
+        {NOME_DO_CAMPO[campo] ?? campo}: {valorLegivel(campo, a.antes[campo as keyof typeof a.antes])} →{' '}
+        {valorLegivel(campo, a.depois[campo as keyof typeof a.depois])}
+      </li>
+    ));
+
+  return (
+    <Janela titulo={`Alterações de ${usuario.nome}`} aoFechar={aoFechar}>
+      <h2>Alterações</h2>
+      <p className="mudo">{usuario.nome}</p>
+      {lista.isError && <p className="erro" role="alert">{mensagemDe(lista.error, 'Não foi possível carregar as alterações.')}</p>}
+      {lista.isPending && <p className="mudo">Carregando…</p>}
+      {lista.isSuccess && lista.data.alteracoes.length === 0 && <p>Nenhuma alteração.</p>}
+      {lista.isSuccess && lista.data.alteracoes.length > 0 && (
+        <ol className="lista">
+          {lista.data.alteracoes.map((a) => (
+            <li key={a.id}>
+              <p className="mudo">{quando(a.criadoEm)} · por {a.alteradoPor}</p>
+              <ul>{linhas(a)}</ul>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="acoes"><button className="pri" onClick={aoFechar}>Fechar</button></div>
+    </Janela>
+  );
+}
+
+/** RF-04: muda nome, papel e setor. A mudança vale na próxima tela que a pessoa abrir e fica no registro de alterações. */
+function EditarUsuario({ usuario, meuId, aoFechar }: { usuario: UsuarioLinha; meuId: string; aoFechar: () => void }) {
+  const cache = useQueryClient();
+  const [f, setF] = useState({ nome: usuario.nome, papel: usuario.papel, setor: usuario.setor ?? '' });
+  const [erro, setErro] = useState('');
+  const corpo = () => ({ ...f, setor: f.papel === 'setor' ? f.setor || undefined : undefined });
+  const travado = usuario.id === meuId;
+
+  const salvar = useMutation({
+    mutationFn: () => api.editarUsuario(usuario.id, edicaoUsuarioBody.parse(corpo())),
+    onSuccess: async () => {
+      await cache.invalidateQueries({ queryKey: ['usuarios'] });
+      await cache.invalidateQueries({ queryKey: ['alteracoes', usuario.id] });
+      aoFechar();
+    },
+    onError: (e) => setErro(mensagemDe(e, 'Não foi possível salvar.')),
+  });
+
+  function enviar(e: FormEvent) {
+    e.preventDefault();
+    const lido = edicaoUsuarioBody.safeParse(corpo());
+    if (!lido.success) return setErro(lido.error.issues[0]?.message ?? 'Confira os dados.');
+    setErro('');
+    salvar.mutate();
+  }
+
+  return (
+    <Janela titulo={`Editar ${usuario.nome}`} aoFechar={aoFechar}>
+      <form onSubmit={enviar}>
+        <h2>Editar usuário</h2>
+        <p className="mudo">{usuario.email ?? 'sem e-mail cadastrado'}</p>
+        <label htmlFor="e-nome">Nome</label>
+        <input id="e-nome" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} autoComplete="off" />
+        <label htmlFor="e-papel">Perfil</label>
+        <select
+          id="e-papel"
+          value={f.papel}
+          onChange={(e) => setF({ ...f, papel: e.target.value as Papel })}
+          aria-describedby={travado ? 'e-papel-ajuda' : undefined}
+        >
+          {papeis.map((p) => (
+            <option key={p} value={p} disabled={!podeEditarUsuario(meuId, usuario.id, p)}>{NOME_DO_PAPEL[p]}</option>
+          ))}
+        </select>
+        {travado && (
+          <p id="e-papel-ajuda" className="mudo">Você não pode tirar de si o papel de Administrador.</p>
+        )}
+        {f.papel === 'setor' && (
+          <>
+            <label htmlFor="e-setor">Setor</label>
+            <select id="e-setor" value={f.setor} onChange={(e) => setF({ ...f, setor: e.target.value })}>
+              <option value="">Escolha o setor</option>
+              {SETORES.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </>
+        )}
+        {erro && <p className="erro" role="alert">{erro}</p>}
+        <div className="acoes">
+          <button type="button" className="sec" onClick={aoFechar}>Cancelar</button>
+          <button className="pri" disabled={salvar.isPending}>{salvar.isPending ? 'Salvando…' : 'Salvar'}</button>
+        </div>
+      </form>
+    </Janela>
   );
 }
 

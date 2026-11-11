@@ -15,13 +15,19 @@ const NOME_REPETIDO = (nome: string): Falha => ({ ok: false, status: 409, erro: 
 export async function listarPrecos(db: Db, perfil: Perfil): Promise<{ ok: true; produtos: ProdutoDePreco[] } | Falha> {
   if (!podeGerenciarPrecos(perfil)) return SEM_PERMISSAO;
   const produtos = await db.query<ProdutoDePreco>(
-    `select p.id, p.nome, p.malha, p.preco_maior_centavos as "maiorCentavos", p.preco_menor_centavos as "menorCentavos",
+    `select p.id, p.nome, p.malha, p.faixas,
             p.ativo, p.atualizado_em as "atualizadoEm", u.nome as "atualizadoPor"
        from produtos p left join perfis u on u.id = p.atualizado_por
       order by p.ativo desc, p.nome`,
   );
   return { ok: true, produtos };
 }
+
+/**
+ * As colunas antigas (menos de 10 e 10 ou mais) seguem gravadas com a primeira e a última faixa, para a versão anterior
+ * da API continuar lendo preços durante a publicação e dar para voltar atrás (migração 007). As faixas vão como texto JSON convertido no SQL (CLAUDE.md, regra 6).
+ */
+const precosAntigos = (body: ProdutoBody) => [body.faixas[0]!.centavos, body.faixas.at(-1)!.centavos, JSON.stringify(body.faixas)];
 
 /** RN-11: cria um produto. O preço dos pedidos já feitos não muda: cada item guarda o preço do dia. */
 export async function criarProduto(db: Db, perfil: Perfil, body: ProdutoBody): Promise<{ ok: true; id: string } | Falha> {
@@ -30,9 +36,9 @@ export async function criarProduto(db: Db, perfil: Perfil, body: ProdutoBody): P
   if (igual) return NOME_REPETIDO(body.nome);
   try {
     const [novo] = await db.query<{ id: string }>(
-      `insert into produtos (nome, malha, preco_maior_centavos, preco_menor_centavos, ativo, atualizado_por)
-       values ($1, $2, $3, $4, $5, $6) returning id`,
-      [body.nome, body.malha, body.maiorCentavos, body.menorCentavos, body.ativo, perfil.id],
+      `insert into produtos (nome, malha, preco_menor_centavos, preco_maior_centavos, faixas, ativo, atualizado_por)
+       values ($1, $2, $3, $4, ($5::text)::jsonb, $6, $7) returning id`,
+      [body.nome, body.malha, ...precosAntigos(body), body.ativo, perfil.id],
     );
     return { ok: true, id: novo!.id };
   } catch (erro) {
@@ -50,10 +56,10 @@ export async function atualizarProduto(db: Db, perfil: Perfil, id: string, body:
   if (igual) return NOME_REPETIDO(body.nome);
   try {
     await db.query(
-      `update produtos set nome = $2, malha = $3, preco_maior_centavos = $4, preco_menor_centavos = $5, ativo = $6,
-              atualizado_por = $7, atualizado_em = now()
+      `update produtos set nome = $2, malha = $3, preco_menor_centavos = $4, preco_maior_centavos = $5, faixas = ($6::text)::jsonb,
+              ativo = $7, atualizado_por = $8, atualizado_em = now()
         where id = $1`,
-      [id, body.nome, body.malha, body.maiorCentavos, body.menorCentavos, body.ativo, perfil.id],
+      [id, body.nome, body.malha, ...precosAntigos(body), body.ativo, perfil.id],
     );
   } catch (erro) {
     if (ehRepetido(erro)) return NOME_REPETIDO(body.nome);

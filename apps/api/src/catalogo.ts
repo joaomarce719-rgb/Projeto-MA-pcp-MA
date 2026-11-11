@@ -11,7 +11,7 @@ export async function listarCatalogo(db: Db, perfil: Perfil): Promise<{ ok: true
     return { ok: false, status: 403, erro: 'Esta área não faz parte do seu perfil.' };
   }
   const produtos = await db.query<ProdutoDoCatalogo>(
-    `select id, nome, malha, preco_maior_centavos as "maiorCentavos", preco_menor_centavos as "menorCentavos"
+    `select id, nome, malha, faixas
        from produtos where ativo order by nome`,
   );
   return { ok: true, produtos };

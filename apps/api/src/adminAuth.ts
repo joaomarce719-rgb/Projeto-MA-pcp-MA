@@ -32,6 +32,13 @@ function motivoDe({ json }: Resposta): MotivoDaRecusa | null {
   return null;
 }
 
+/** O que o Supabase disse na recusa (código e mensagem, nunca a chave), para o log mostrar o motivo. */
+function detalheDe({ status, json }: Resposta): string {
+  const codigo = String(json.error_code ?? json.code ?? '');
+  const texto = String(json.msg ?? json.message ?? json.error_description ?? json.error ?? '').slice(0, 200);
+  return `HTTP ${status}${codigo ? `, ${codigo}` : ''}${texto ? `: ${texto}` : ''}`;
+}
+
 export function adminSupabase(supabaseUrl: string, chave: string | undefined): AdminAuth {
   const base = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/admin/users`;
 
@@ -57,7 +64,7 @@ export function adminSupabase(supabaseUrl: string, chave: string | undefined): A
       if (r.status >= 200 && r.status < 300 && typeof r.json.id === 'string') return { ok: true, id: r.json.id };
       const motivo = motivoDe(r);
       if (motivo) return { ok: false, motivo };
-      throw new Error(`O Supabase Auth recusou a criação do usuário (HTTP ${r.status}).`);
+      throw new Error(`O Supabase Auth recusou a criação do usuário (${detalheDe(r)})`);
     },
 
     async trocarSenha(id, senha) {
@@ -66,12 +73,12 @@ export function adminSupabase(supabaseUrl: string, chave: string | undefined): A
       if (r.status === 404) return { ok: false, motivo: 'nao_existe' };
       const motivo = motivoDe(r);
       if (motivo) return { ok: false, motivo };
-      throw new Error(`O Supabase Auth recusou a troca de senha (HTTP ${r.status}).`);
+      throw new Error(`O Supabase Auth recusou a troca de senha (${detalheDe(r)})`);
     },
 
     async apagar(id) {
       const r = await chamar('DELETE', `/${id}`);
-      if (r.status >= 300 && r.status !== 404) throw new Error(`O Supabase Auth recusou apagar o usuário (HTTP ${r.status}).`);
+      if (r.status >= 300 && r.status !== 404) throw new Error(`O Supabase Auth recusou apagar o usuário (${detalheDe(r)})`);
     },
   };
 }

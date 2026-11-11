@@ -23,7 +23,7 @@ async function criarAtendenteDePrecos() {
   );
 }
 
-const produtoNovo = { nome: 'Camisa polo piquet', malha: 'piquet', maiorCentavos: 4500, menorCentavos: 5200, ativo: true };
+const produtoNovo = { nome: 'Camisa polo piquet', malha: 'piquet', faixas: [{ aPartirDe: 1, centavos: 5200 }, { aPartirDe: 10, centavos: 4500 }], ativo: true };
 
 async function produtos(quem: string) {
   return (await json<{ produtos: ProdutoDePreco[] }>(amb.chamar(quem, '/precos'))).produtos;
@@ -58,7 +58,7 @@ describe('quem gerencia preços (RN-11)', () => {
       const lista = await produtos(quem);
       expect(lista).toHaveLength(46);
       expect(lista.find((p) => p.nome === 'FAIXA DE CAPITÃO')?.ativo).toBe(false);
-      expect(lista.find((p) => p.nome === 'CAMISA ADULTO MALHA DRY FIT')).toMatchObject({ maiorCentavos: 3500, menorCentavos: 4200, ativo: true });
+      expect(lista.find((p) => p.nome === 'CAMISA ADULTO MALHA DRY FIT')).toMatchObject({ faixas: [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3500 }], ativo: true });
     }
   });
 
@@ -94,7 +94,7 @@ describe('POST /precos: novo produto', () => {
     const r = await amb.chamar(ATENDENTE_DE_PRECOS, '/precos', produtoNovo);
     expect(r.status).toBe(201);
     const criado = (await produtos(ID.admin)).find((p) => p.nome === 'CAMISA POLO PIQUET');
-    expect(criado).toMatchObject({ malha: 'PIQUET', maiorCentavos: 4500, menorCentavos: 5200, ativo: true, atualizadoPor: 'Rita Preços' });
+    expect(criado).toMatchObject({ malha: 'PIQUET', faixas: [{ aPartirDe: 1, centavos: 5200 }, { aPartirDe: 10, centavos: 4500 }], ativo: true, atualizadoPor: 'Rita Preços' });
   });
 
   it('o produto novo aparece no catálogo do pedido e já pode ser vendido com o preço novo', async () => {
@@ -112,12 +112,12 @@ describe('POST /precos: novo produto', () => {
   });
 
   it('recusa dados inválidos com a frase certa e não grava nada', async () => {
-    const invertido = await amb.chamar(ID.admin, '/precos', { ...produtoNovo, maiorCentavos: 6000 });
+    const invertido = await amb.chamar(ID.admin, '/precos', { ...produtoNovo, faixas: [{ aPartirDe: 1, centavos: 5200 }, { aPartirDe: 10, centavos: 6000 }] });
     expect(invertido.status).toBe(400);
     expect((await json<{ erro: string }>(invertido)).erro).toMatch(/não pode ser maior/);
-    expect((await amb.chamar(ID.admin, '/precos', { ...produtoNovo, menorCentavos: 0 })).status).toBe(400);
+    expect((await amb.chamar(ID.admin, '/precos', { ...produtoNovo, faixas: [{ aPartirDe: 1, centavos: 0 }] })).status).toBe(400);
     expect((await amb.chamar(ID.admin, '/precos', { ...produtoNovo, nome: '' })).status).toBe(400);
-    expect((await amb.chamar(ID.admin, '/precos', { ...produtoNovo, menorCentavos: '52,00' })).status).toBe(400);
+    expect((await amb.chamar(ID.admin, '/precos', { ...produtoNovo, faixas: [{ aPartirDe: 1, centavos: '52,00' }] })).status).toBe(400);
     expect(await produtos(ID.admin)).toHaveLength(46);
   });
 });
@@ -131,19 +131,19 @@ describe('POST /precos/:id: alterar preço, nome e situação', () => {
   it('a Direção muda os preços sem precisar da marca', async () => {
     const id = await idDo('CAMISA ADULTO MALHA DRY FIT');
     const antes = (await produtos(ID.admin)).find((p) => p.id === id)!;
-    const r = await amb.chamar(ID.direcao, `/precos/${id}`, { nome: antes.nome, malha: antes.malha, maiorCentavos: 3900, menorCentavos: 4600, ativo: true });
+    const r = await amb.chamar(ID.direcao, `/precos/${id}`, { nome: antes.nome, malha: antes.malha, faixas: [{ aPartirDe: 1, centavos: 4600 }, { aPartirDe: 10, centavos: 3900 }], ativo: true });
     expect(r.status).toBe(200);
-    expect((await produtos(ID.admin)).find((p) => p.id === id)).toMatchObject({ maiorCentavos: 3900, menorCentavos: 4600 });
+    expect((await produtos(ID.admin)).find((p) => p.id === id)).toMatchObject({ faixas: [{ aPartirDe: 1, centavos: 4600 }, { aPartirDe: 10, centavos: 3900 }] });
   });
 
   it('muda os preços e registra quem e quando', async () => {
     await criarAtendenteDePrecos();
     const id = await idDo('CAMISA ADULTO MALHA DRY FIT');
     const antes = (await produtos(ID.admin)).find((p) => p.id === id)!;
-    const r = await amb.chamar(ATENDENTE_DE_PRECOS, `/precos/${id}`, { nome: antes.nome, malha: antes.malha, maiorCentavos: 3800, menorCentavos: 4500, ativo: true });
+    const r = await amb.chamar(ATENDENTE_DE_PRECOS, `/precos/${id}`, { nome: antes.nome, malha: antes.malha, faixas: [{ aPartirDe: 1, centavos: 4500 }, { aPartirDe: 10, centavos: 3800 }], ativo: true });
     expect(r.status).toBe(200);
     const depois = (await produtos(ID.admin)).find((p) => p.id === id)!;
-    expect(depois).toMatchObject({ maiorCentavos: 3800, menorCentavos: 4500, atualizadoPor: 'Rita Preços' });
+    expect(depois).toMatchObject({ faixas: [{ aPartirDe: 1, centavos: 4500 }, { aPartirDe: 10, centavos: 3800 }], atualizadoPor: 'Rita Preços' });
     expect(new Date(depois.atualizadoEm).getTime()).toBeGreaterThanOrEqual(new Date(antes.atualizadoEm).getTime());
   });
 
@@ -152,7 +152,7 @@ describe('POST /precos/:id: alterar preço, nome e situação', () => {
     expect(antigo.totalCentavos).toBe(10 * 3500);
 
     const id = await idDo('CAMISA ADULTO MALHA DRY FIT');
-    await amb.chamar(ID.admin, `/precos/${id}`, { nome: 'Camisa adulto malha dry fit', malha: 'dry fit', maiorCentavos: 4000, menorCentavos: 4800, ativo: true });
+    await amb.chamar(ID.admin, `/precos/${id}`, { nome: 'Camisa adulto malha dry fit', malha: 'dry fit', faixas: [{ aPartirDe: 1, centavos: 4800 }, { aPartirDe: 10, centavos: 4000 }], ativo: true });
 
     const novo = await abrirPedido('CAMISA ADULTO MALHA DRY FIT', { M: 10 });
     expect(novo.totalCentavos).toBe(10 * 4000);
@@ -164,7 +164,7 @@ describe('POST /precos/:id: alterar preço, nome e situação', () => {
 
   it('desativar tira do catálogo do pedido novo e reativar traz de volta', async () => {
     const id = await idDo('FAIXA DE CAPITÃO');
-    const base = { nome: 'Faixa de capitão', malha: 'elástico', maiorCentavos: 1000, menorCentavos: 1200 };
+    const base = { nome: 'Faixa de capitão', malha: 'elástico', faixas: [{ aPartirDe: 1, centavos: 1200 }, { aPartirDe: 10, centavos: 1000 }] };
     await amb.chamar(ID.admin, `/precos/${id}`, { ...base, ativo: false });
     const sem = await json<{ produtos: ProdutoDoCatalogo[] }>(amb.chamar(ID.atendimento, '/catalogo'));
     expect(sem.produtos.some((p) => p.nome === 'FAIXA DE CAPITÃO')).toBe(false);
@@ -177,7 +177,7 @@ describe('POST /precos/:id: alterar preço, nome e situação', () => {
 
   it('renomear para um nome que já existe dá conflito; manter o próprio nome não', async () => {
     const id = await idDo('FAIXA DE CAPITÃO');
-    const corpo = { malha: 'elástico', maiorCentavos: 1000, menorCentavos: 1200, ativo: true };
+    const corpo = { malha: 'elástico', faixas: [{ aPartirDe: 1, centavos: 1200 }, { aPartirDe: 10, centavos: 1000 }], ativo: true };
     expect((await amb.chamar(ID.admin, `/precos/${id}`, { ...corpo, nome: 'Camisa adulto malha dry fit' })).status).toBe(409);
     expect((await amb.chamar(ID.admin, `/precos/${id}`, { ...corpo, nome: 'Faixa de capitão' })).status).toBe(200);
   });
@@ -186,8 +186,8 @@ describe('POST /precos/:id: alterar preço, nome e situação', () => {
     expect((await amb.chamar(ID.admin, '/precos/00000000-0000-4000-8000-000000000000', produtoNovo)).status).toBe(404);
     expect((await amb.chamar(ID.admin, '/precos/abc', produtoNovo)).status).toBe(400);
     const id = await idDo('CAMISA ADULTO MALHA DRY FIT');
-    expect((await amb.chamar(ID.admin, `/precos/${id}`, { ...produtoNovo, maiorCentavos: 9000 })).status).toBe(400);
-    expect((await produtos(ID.admin)).find((p) => p.id === id)?.maiorCentavos).toBe(3500);
+    expect((await amb.chamar(ID.admin, `/precos/${id}`, { ...produtoNovo, faixas: [{ aPartirDe: 1, centavos: 5200 }, { aPartirDe: 10, centavos: 9000 }] })).status).toBe(400);
+    expect((await produtos(ID.admin)).find((p) => p.id === id)?.faixas).toEqual([{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3500 }]);
   });
 });
 

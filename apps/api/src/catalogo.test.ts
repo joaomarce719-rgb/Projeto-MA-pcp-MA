@@ -1,4 +1,4 @@
-import { diaEmFortaleza, somarDias, type FichaLote, type OrcamentoDoPedido, type ProdutoDoCatalogo } from '@pcp/shared';
+import { diaEmFortaleza, precoDaFaixa, somarDias, type FaixaDePreco, type FichaLote, type OrcamentoDoPedido, type ProdutoDoCatalogo } from '@pcp/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ID, criarAmbiente, type Ambiente } from './test-support';
 
@@ -37,8 +37,8 @@ describe('GET /catalogo (RF-10)', () => {
     const { produtos } = await json<{ produtos: ProdutoDoCatalogo[] }>(amb.chamar(ID.atendimento, '/catalogo'));
     expect(produtos).toHaveLength(46);
     expect(produtos.map((p) => p.nome)).toEqual([...produtos.map((p) => p.nome)].sort((a, b) => a.localeCompare(b)));
-    expect(produtos.find((p) => p.nome === 'CAMISA ADULTO MALHA DRY FIT')).toMatchObject({ malha: 'DRY FIT', maiorCentavos: 3500, menorCentavos: 4200 });
-    expect(produtos.every((p) => Number.isInteger(p.maiorCentavos) && Number.isInteger(p.menorCentavos))).toBe(true);
+    expect(produtos.find((p) => p.nome === 'CAMISA ADULTO MALHA DRY FIT')).toMatchObject({ malha: 'DRY FIT', faixas: [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 10, centavos: 3500 }] });
+    expect(produtos.every((p) => p.faixas.length > 0 && p.faixas[0]!.aPartirDe === 1 && p.faixas.every((f) => Number.isInteger(f.centavos)))).toBe(true);
   });
 
   it('produto desativado sai do catálogo', async () => {
@@ -62,6 +62,25 @@ describe('preço do pedido, calculado no servidor (RN-07 a RN-10)', () => {
     expect(nove.totalCentavos).toBe(9 * 4200);
   });
 
+  it('faixas por produto: com 3 faixas, cada quantidade paga a sua; com uma faixa só, preço único', async () => {
+    const camisa = 'CAMISA ADULTO MALHA DRY FIT';
+    const { rows } = await amb.pg.query<{ id: string; malha: string }>('select id, malha from produtos where nome = $1', [camisa]);
+    const faixas = [{ aPartirDe: 1, centavos: 4200 }, { aPartirDe: 15, centavos: 3800 }, { aPartirDe: 20, centavos: 3500 }];
+    const r = await amb.chamar(ID.admin, `/precos/${rows[0]!.id}`, { nome: camisa, malha: rows[0]!.malha, faixas, ativo: true });
+    expect(r.status).toBe(200);
+    // As colunas antigas acompanham (primeira e última faixa), para a versão anterior da API durante a publicação.
+    expect((await amb.pg.query('select preco_menor_centavos as menor, preco_maior_centavos as maior from produtos where id = $1', [rows[0]!.id])).rows[0]).toEqual({ menor: 4200, maior: 3500 });
+
+    for (const [pecas, unitario] of [[14, 4200], [15, 3800], [19, 3800], [20, 3500], [30, 3500]] as const) {
+      const { totalCentavos } = await json<{ totalCentavos: number }>(await abrir([item(camisa, { M: pecas })]));
+      expect(totalCentavos, `${pecas} peças`).toBe(pecas * unitario);
+    }
+
+    await amb.chamar(ID.admin, `/precos/${rows[0]!.id}`, { nome: camisa, malha: rows[0]!.malha, faixas: [{ aPartirDe: 1, centavos: 3900 }], ativo: true });
+    expect((await json<{ totalCentavos: number }>(await abrir([item(camisa, { M: 3 })]))).totalCentavos).toBe(3 * 3900);
+    expect((await json<{ totalCentavos: number }>(await abrir([item(camisa, { M: 40 })]))).totalCentavos).toBe(40 * 3900);
+  });
+
   it('a faixa vale por produto: 6 camisas + 6 calções, cada produto na faixa de menos de 10', async () => {
     const r = await json<{ totalCentavos: number }>(
       await abrir([item('CAMISA ADULTO MALHA DRY FIT', { M: 6 }), item('CALÇÃO ADULTO MALHA DRY FIT', { M: 6 })]),
@@ -78,7 +97,7 @@ describe('preço do pedido, calculado no servidor (RN-07 a RN-10)', () => {
 
   it('grava o preço no item (cópia do dia) e o total no pedido; mudar o catálogo depois não muda o pedido', async () => {
     const { id } = await json<{ id: string }>(await abrir([item('CAMISA ADULTO MALHA DRY FIT', { M: 10 })]));
-    await amb.pg.query(`update produtos set preco_maior_centavos = 9999 where nome = 'CAMISA ADULTO MALHA DRY FIT'`);
+    await amb.pg.query(`update produtos set faixas = '[{"aPartirDe":1,"centavos":9999}]' where nome = 'CAMISA ADULTO MALHA DRY FIT'`);
     const { rows } = await amb.pg.query(
       'select i.produto, i.malha, i.preco_unitario_centavos, i.adicionais_unitario_centavos, i.subtotal_centavos, l.total_centavos from itens_pedido i join lotes l on l.id = i.lote_id where l.id = $1',
       [id],
@@ -195,7 +214,7 @@ describe('malha na ficha, sem preços para o setor (RF-20 e RF-02)', () => {
   });
 
   async function precoDe(nome: string, quantidade: number): Promise<number> {
-    const { rows } = await amb.pg.query<{ maior: number; menor: number }>('select preco_maior_centavos as maior, preco_menor_centavos as menor from produtos where nome = $1', [nome]);
-    return quantidade >= 10 ? rows[0]!.maior : rows[0]!.menor;
+    const { rows } = await amb.pg.query<{ faixas: FaixaDePreco[] }>('select faixas from produtos where nome = $1', [nome]);
+    return precoDaFaixa(rows[0]!.faixas, quantidade);
   }
 });

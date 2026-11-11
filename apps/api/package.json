@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "dev:local": "tsx src/dev-local.ts"
+    "dev:local": "tsx src/dev-local.ts",
+    "criar-admin": "tsx src/criar-admin.ts"
   },
   "dependencies": {
     "@pcp/shared": "*",

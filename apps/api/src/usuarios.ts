@@ -1,4 +1,14 @@
-import { gerenciaUsuarios, type Perfil, type UsuarioBody, type UsuarioLinha } from '@pcp/shared';
+import {
+  gerenciaUsuarios,
+  mudancasDoUsuario,
+  podeEditarUsuario,
+  type AlteracaoUsuario,
+  type CamposEditaveis,
+  type EdicaoUsuarioBody,
+  type Perfil,
+  type UsuarioBody,
+  type UsuarioLinha,
+} from '@pcp/shared';
 import type { AdminAuth } from './adminAuth';
 import type { Db } from './db';
 import type { Falha } from './lote';
@@ -24,7 +34,14 @@ export async function criarUsuario(
   body: UsuarioBody,
 ): Promise<{ ok: true; id: string } | Falha> {
   if (!gerenciaUsuarios(perfil)) return SO_ADMIN;
+  return criarAcesso(db, auth, body);
+}
 
+/**
+ * Cria o login e o perfil, sem conferir quem pede: a tela de Usuários confere antes (`criarUsuario`), e o script
+ * `criar-admin.ts` é rodado por quem tem a chave secreta do Supabase e a senha do banco (o primeiro Administrador).
+ */
+export async function criarAcesso(db: Db, auth: AdminAuth, body: UsuarioBody): Promise<{ ok: true; id: string } | Falha> {
   const [igual] = await db.query<{ nome: string }>('select nome from perfis where lower(email) = $1', [body.email]);
   if (igual) return { ok: false, status: 409, erro: `Já existe um usuário com este e-mail: ${igual.nome}.` };
 
@@ -77,6 +94,53 @@ export async function mudarGerenciaPrecos(db: Db, perfil: Perfil, id: string, ge
   }
   await db.query('update perfis set gerencia_precos = $2 where id = $1', [id, gerenciaPrecos]);
   return { ok: true };
+}
+
+/**
+ * RF-04: muda nome, papel e setor de quem já existe e grava o que mudou em `alteracoes_usuarios` (migração 006), na
+ * mesma transação. Papel e setor são lidos do `perfis` a cada requisição, então a mudança vale na próxima.
+ */
+export async function editarUsuario(db: Db, perfil: Perfil, id: string, body: EdicaoUsuarioBody): Promise<{ ok: true } | Falha> {
+  if (!gerenciaUsuarios(perfil)) return SO_ADMIN;
+  if (!podeEditarUsuario(perfil.id, id, body.papel)) {
+    return { ok: false, status: 409, erro: 'Você não pode tirar de si o papel de Administrador.' };
+  }
+  return db.transaction(async (tx) => {
+    // "for update": duas edições ao mesmo tempo entram em fila; vale a última.
+    const [atual] = await tx.query<CamposEditaveis>(
+      'select nome, papel, setor, gerencia_precos as "gerenciaPrecos" from perfis where id = $1 for update',
+      [id],
+    );
+    if (!atual) return { ok: false, status: 404, erro: 'Usuário não encontrado.' } as const;
+    const mudou = mudancasDoUsuario(atual, body);
+    if (!mudou) return { ok: true } as const;
+    await tx.query(
+      `update perfis set nome = $2, papel = $3, setor = $4, gerencia_precos = gerencia_precos and $3 = 'atendimento' where id = $1`,
+      [id, body.nome, body.papel, body.papel === 'setor' ? (body.setor ?? null) : null],
+    );
+    await tx.query(
+      'insert into alteracoes_usuarios (perfil_id, alterado_por, antes, depois) values ($1, $2, ($3::text)::jsonb, ($4::text)::jsonb)',
+      [id, perfil.id, JSON.stringify(mudou.antes), JSON.stringify(mudou.depois)],
+    );
+    return { ok: true } as const;
+  });
+}
+
+/** RF-04: o registro de alterações de um usuário, a mais recente primeiro (só o Administrador). */
+export async function listarAlteracoes(db: Db, perfil: Perfil, id: string): Promise<{ ok: true; alteracoes: AlteracaoUsuario[] } | Falha> {
+  if (!gerenciaUsuarios(perfil)) return SO_ADMIN;
+  const [existe] = await db.query('select 1 as ok from perfis where id = $1', [id]);
+  if (!existe) return { ok: false, status: 404, erro: 'Usuário não encontrado.' };
+  const alteracoes = await db.query<AlteracaoUsuario>(
+    `select a.id::text as id, to_char(a.criado_em at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "criadoEm",
+            p.nome as "alteradoPor", a.antes, a.depois
+       from alteracoes_usuarios a
+       join perfis p on p.id = a.alterado_por
+      where a.perfil_id = $1
+      order by a.criado_em desc, a.id desc`,
+    [id],
+  );
+  return { ok: true, alteracoes };
 }
 
 /** D13: quem não recebe e-mail de "esqueci a senha" tem a senha redefinida pelo Administrador. */

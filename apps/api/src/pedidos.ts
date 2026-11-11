@@ -8,6 +8,7 @@ import {
   precificarItem,
   quantidadeDaGrade,
   tituloDoProduto,
+  type FaixaDePreco,
   type Perfil,
   type PedidoBody,
 } from '@pcp/shared';
@@ -19,8 +20,7 @@ export type ResultadoPedido = { ok: true; id: string; numero: number; entradaId:
 interface ProdutoDoCatalogo {
   nome: string;
   malha: string;
-  maior: number;
-  menor: number;
+  faixas: FaixaDePreco[];
 }
 
 /**
@@ -42,7 +42,7 @@ export async function criarPedido(db: Db, perfil: Perfil, body: PedidoBody): Pro
     const catalogo = new Map(
       (
         await tx.query<ProdutoDoCatalogo>(
-          `select nome, malha, preco_maior_centavos as maior, preco_menor_centavos as menor from produtos where ativo`,
+          `select nome, malha, faixas from produtos where ativo`,
         )
       ).map((p) => [p.nome.toUpperCase(), p]),
     );
@@ -60,7 +60,7 @@ export async function criarPedido(db: Db, perfil: Perfil, body: PedidoBody): Pro
       const quantidade = quantidadeDaGrade(item.modo, item.grade);
       const preco =
         body.tipo === 'Cliente'
-          ? precificarItem({ quantidade, maiorCentavos: produto.maior, menorCentavos: produto.menor, adicionais: item.adicionais })
+          ? precificarItem({ quantidade, faixas: produto.faixas, adicionais: item.adicionais })
           : { precoUnitarioCentavos: 0, adicionaisUnitarioCentavos: 0, subtotalCentavos: 0 };
       itens.push({
         ordem: i + 1,

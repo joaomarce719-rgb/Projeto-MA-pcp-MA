@@ -1,5 +1,4 @@
 import {
-  FAIXA_DE_PECAS,
   FORMAS_PAGAMENTO,
   FOTOS_POR_PEDIDO,
   PRIORIDADES,
@@ -8,6 +7,8 @@ import {
   TAMANHOS,
   clienteBody,
   diaEmFortaleza,
+  proximaFaixa,
+  rotuloDaFaixa,
   entradaSugeridaCentavos,
   erroDaDataDeEntrega,
   erroDoRecebimento,
@@ -120,7 +121,7 @@ const pecasDoItem = (i: ItemEd) => quantidadeDaGrade(i.modo, numeros(i.grade));
 /** Preço do item pelo catálogo (a API refaz a conta ao abrir o pedido; aqui é só para mostrar). */
 function precoDoItem(i: ItemEd, catalogo: ProdutoDoCatalogo[]) {
   const p = catalogo.find((x) => x.nome === i.produto);
-  return p ? precificarItem({ quantidade: pecasDoItem(i), maiorCentavos: p.maiorCentavos, menorCentavos: p.menorCentavos, adicionais: i.adicionais }) : null;
+  return p ? precificarItem({ quantidade: pecasDoItem(i), faixas: p.faixas, adicionais: i.adicionais }) : null;
 }
 
 /** Pedido de Feira não é cobrado. */
@@ -513,7 +514,7 @@ function PassoProdutos({ r, mudar, catalogo }: Passo & { catalogo: ProdutoDoCata
             <strong>{tituloDoProduto(p.nome)}</strong>
             <span className="mudo">
               Malha {tituloDoProduto(p.malha)}
-              {cobrado && ` · ${formatarReais(p.maiorCentavos)} (${FAIXA_DE_PECAS} peças ou mais) · ${formatarReais(p.menorCentavos)} (menos de ${FAIXA_DE_PECAS})`}
+              {cobrado && ` · ${p.faixas.map((x, j) => `${formatarReais(x.centavos)} (${rotuloDaFaixa(p.faixas, j)})`).join(' · ')}`}
             </span>
           </button>
         ))}
@@ -570,9 +571,10 @@ function PassoProdutos({ r, mudar, catalogo }: Passo & { catalogo: ProdutoDoCata
                 </>
               )}
             </p>
-            {cobrado && produto && pecas > 0 && pecas < FAIXA_DE_PECAS && (
+            {cobrado && produto && pecas > 0 && proximaFaixa(produto.faixas, pecas) && (
               <p className="aviso">
-                Com {FAIXA_DE_PECAS} peças ou mais deste produto, o preço cai para {formatarReais(produto.maiorCentavos)} por peça.
+                Com {proximaFaixa(produto.faixas, pecas)!.aPartirDe} peças ou mais deste produto, o preço cai para{' '}
+                {formatarReais(proximaFaixa(produto.faixas, pecas)!.centavos)} por peça.
               </p>
             )}
           </section>

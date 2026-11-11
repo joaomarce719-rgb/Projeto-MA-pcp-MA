@@ -1,8 +1,10 @@
 import {
   formatarReais,
   lerValorEmCentavos,
+  FAIXAS_POR_PRODUTO,
   podeGerenciarPrecos,
   produtoBody,
+  rotuloDaFaixa,
   tituloDoProduto,
   type ProdutoBody,
   type ProdutoDePreco,
@@ -55,8 +57,8 @@ function Painel() {
       <h1>Preços dos produtos</h1>
       <p className="mudo">
         {plural(produtos.filter((p) => p.ativo).length, 'produto ativo', 'produtos ativos')} ·{' '}
-        {plural(produtos.filter((p) => !p.ativo).length, 'desativado', 'desativados')}. Preço por peça: a faixa de
-        10 peças ou mais e a de menos de 10 valem por produto do pedido. Alterar um preço vale só para os pedidos
+        {plural(produtos.filter((p) => !p.ativo).length, 'desativado', 'desativados')}. Preço por peça: cada produto
+        tem as suas faixas de quantidade, contadas por produto do pedido. Alterar um preço vale só para os pedidos
         novos; os pedidos já abertos mantêm o preço do dia. Os adicionais (patch, punho e gola V) não mudam aqui.
       </p>
 
@@ -84,14 +86,12 @@ function Painel() {
               </div>
               <p className="mudo">Malha: {tituloDoProduto(p.malha)}</p>
               <div className="precos-do-produto">
-                <span>
-                  <small>10 peças ou mais</small>
-                  <strong>{formatarReais(p.maiorCentavos)}</strong>
-                </span>
-                <span>
-                  <small>Menos de 10 peças</small>
-                  <strong>{formatarReais(p.menorCentavos)}</strong>
-                </span>
+                {p.faixas.map((faixa, i) => (
+                  <span key={faixa.aPartirDe}>
+                    <small>{rotuloDaFaixa(p.faixas, i)}</small>
+                    <strong>{formatarReais(faixa.centavos)}</strong>
+                  </span>
+                ))}
               </div>
               <div className="linha">
                 <small className="mudo">
@@ -128,10 +128,14 @@ function FormularioDoProduto({
   const [f, setF] = useState({
     nome: produto ? tituloDoProduto(produto.nome) : '',
     malha: produto ? tituloDoProduto(produto.malha) : '',
-    maior: produto ? emReais(produto.maiorCentavos) : '',
-    menor: produto ? emReais(produto.menorCentavos) : '',
     ativo: produto?.ativo ?? true,
   });
+  // Cada faixa: "a partir de quantas peças" e o preço por peça, como digitados. A primeira começa sempre em 1.
+  const [faixas, setFaixas] = useState(
+    produto ? produto.faixas.map((x) => ({ aPartirDe: String(x.aPartirDe), preco: emReais(x.centavos) })) : [{ aPartirDe: '1', preco: '' }],
+  );
+  const mudarFaixa = (i: number, campo: 'aPartirDe' | 'preco', valor: string) =>
+    setFaixas(faixas.map((x, j) => (j === i ? { ...x, [campo]: valor } : x)));
   const [erro, setErro] = useState('');
 
   const salvar = useMutation({
@@ -148,11 +152,13 @@ function FormularioDoProduto({
 
   function enviar(e: FormEvent) {
     e.preventDefault();
-    const maior = lerValorEmCentavos(f.maior);
-    const menor = lerValorEmCentavos(f.menor);
-    if (maior === null) return setErro('Informe o preço de 10 peças ou mais, por exemplo 35,00.');
-    if (menor === null) return setErro('Informe o preço de menos de 10 peças, por exemplo 42,00.');
-    const lido = produtoBody.safeParse({ nome: f.nome, malha: f.malha, maiorCentavos: maior, menorCentavos: menor, ativo: f.ativo });
+    const lidas = [];
+    for (const [i, x] of faixas.entries()) {
+      const centavos = lerValorEmCentavos(x.preco);
+      if (centavos === null) return setErro(`Informe o preço da faixa ${i + 1}, por exemplo 35,00.`);
+      lidas.push({ aPartirDe: Number(x.aPartirDe), centavos });
+    }
+    const lido = produtoBody.safeParse({ nome: f.nome, malha: f.malha, faixas: lidas, ativo: f.ativo });
     if (!lido.success) return setErro(lido.error.issues[0]?.message ?? 'Confira os dados.');
     setErro('');
     salvar.mutate(lido.data);
@@ -169,10 +175,42 @@ function FormularioDoProduto({
         </small>
         <label htmlFor="p-malha">Malha</label>
         <input id="p-malha" value={f.malha} onChange={(e) => setF({ ...f, malha: e.target.value })} autoComplete="off" />
-        <label htmlFor="p-maior">Preço por peça: 10 peças ou mais (R$)</label>
-        <input id="p-maior" inputMode="decimal" placeholder="35,00" value={f.maior} onChange={(e) => setF({ ...f, maior: e.target.value })} autoComplete="off" />
-        <label htmlFor="p-menor">Preço por peça: menos de 10 peças (R$)</label>
-        <input id="p-menor" inputMode="decimal" placeholder="42,00" value={f.menor} onChange={(e) => setF({ ...f, menor: e.target.value })} autoComplete="off" />
+        <fieldset className="faixas">
+          <legend>Preço por peça, conforme a quantidade</legend>
+          <small className="mudo">Uma faixa só é preço único. Mais faixas: o preço não pode subir quando a quantidade sobe.</small>
+          {faixas.map((x, i) => (
+            <div key={i} className="faixa">
+              <label htmlFor={`p-qtd-${i}`}>A partir de (peças)</label>
+              <input
+                id={`p-qtd-${i}`}
+                inputMode="numeric"
+                value={x.aPartirDe}
+                disabled={i === 0}
+                onChange={(e) => mudarFaixa(i, 'aPartirDe', e.target.value.replace(/\D/g, ''))}
+                autoComplete="off"
+              />
+              <label htmlFor={`p-preco-${i}`}>Preço por peça (R$)</label>
+              <input
+                id={`p-preco-${i}`}
+                inputMode="decimal"
+                placeholder="35,00"
+                value={x.preco}
+                onChange={(e) => mudarFaixa(i, 'preco', e.target.value)}
+                autoComplete="off"
+              />
+              {i > 0 && (
+                <button type="button" className="sec" aria-label={`Remover a faixa ${i + 1}`} onClick={() => setFaixas(faixas.filter((_, j) => j !== i))}>
+                  Remover
+                </button>
+              )}
+            </div>
+          ))}
+          {faixas.length < FAIXAS_POR_PRODUTO && (
+            <button type="button" className="sec" onClick={() => setFaixas([...faixas, { aPartirDe: '', preco: '' }])}>
+              + Adicionar faixa
+            </button>
+          )}
+        </fieldset>
         {produto && (
           <label className="marcar" htmlFor="p-ativo">
             <input id="p-ativo" type="checkbox" checked={f.ativo} onChange={(e) => setF({ ...f, ativo: e.target.checked })} />
